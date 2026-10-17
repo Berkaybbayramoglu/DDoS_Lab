@@ -1,0 +1,1 @@
+Staged LUCID CNN lab: time windows, bidirectional flows, normalization, feature selection and shaping, training and evaluation with confidence intervals, then live DDoS detection, iptables blocking and a post-incident report.

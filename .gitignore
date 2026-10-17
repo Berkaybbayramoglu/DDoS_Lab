@@ -1,0 +1,16 @@
+# lab-only SSH key: generated per machine with tools/make_lab_key.sh, never committed
+lucid-ddos/*/.ssh/
+
+# files Labtainer generates when it builds the lab
+*.tar
+*.tar.gz
+lucid-ddos/config/*-home_tar.list
+
+# outputs of the lab scripts and the developer tools
+__pycache__/
+lucid-ddos/server/work/
+lucid-ddos/server/models/
+lucid-ddos/server/results/
+lucid-ddos/server/replay/
+lucid-ddos/server/data/
+/data/

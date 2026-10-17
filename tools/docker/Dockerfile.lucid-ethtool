@@ -1,0 +1,4 @@
+# Switches segmentation/receive offloads off inside a container's network namespace while the
+# dataset is recorded (see record_lab_sessions.sh).
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ethtool && rm -rf /var/lib/apt/lists/*

@@ -1,0 +1,87 @@
+#
+# Labtainer Dockerfile
+#
+#  This is the default Labtainer Dockerfile template, plesae choose the appropriate
+#  base image below.
+#
+# The labtainer.base image includes the following packages:
+#    build-essential  expect  file  gcc-multilib  gdb  iputils-ping  less  man  manpages-dev 
+#    net-tools  openssh-client  python  sudo  tcl8.6  vim  zip  hexedit  rsyslog
+#
+# The labtainer.network image adds the following packages:
+#   openssl openssh-server openvpn wget tcpdump  update-inetd  xinetd
+#
+ARG registry
+FROM $registry/labtainer.network3
+#FROM $registry/labtainer.network
+#FROM $registry/labtainer.centos
+#FROM $registry/labtainer.lamp
+#
+#  lab is the fully qualified image name, e.g., mylab.some_container.student
+#  labdir is the name of the lab, e.g., mylab 
+#  imagedir is the name of the container
+#  user_name is the USER from the start.config, if other than ubuntu,
+#            then that user must be added in this dockerfile
+#            before the USER command
+#
+ARG lab
+ARG labdir
+ARG imagedir
+ARG user_name
+ARG password
+ARG apt_source
+ARG version
+LABEL version=$version
+ENV APT_SOURCE $apt_source
+RUN /usr/bin/apt-source.sh
+#
+#  put package installation here, e.g.,
+#     RUN apt-get update && apt-get install -y --no-install-recommends somepackage
+#
+# tshark (capture + field extraction for every step), iptables (blocking), feh (to view the plots).
+# PyTorch CPU, numpy and matplotlib go into the system python3 so `python3 0X_*.py` and
+# `sudo python3 10_detect_block.py` both find them; versions are pinned for reproducibility.
+RUN apt-get update && echo "wireshark-common wireshark-common/install-setuid boolean false" | debconf-set-selections && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tshark iptables iproute2 feh && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip3 install --no-cache-dir --break-system-packages torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip3 install --no-cache-dir --break-system-packages numpy==1.26.4 matplotlib==3.11.2
+# no __pycache__ in the student's home (it would end up in the collected artifacts)
+ENV PYTHONDONTWRITEBYTECODE=1
+# global Python hash seed (seed 42 everywhere, see lablib.set_seed)
+ENV PYTHONHASHSEED=42
+RUN echo 'Defaults env_keep += "PYTHONDONTWRITEBYTECODE"' > /etc/sudoers.d/lucid && chmod 440 /etc/sudoers.d/lucid
+#
+#
+# Install the system files found in the _system directory
+#
+ADD $labdir/$imagedir/sys_tar/sys.tar /
+ADD $labdir/sys_$lab.tar.gz /
+#
+RUN deluser --remove-home ubuntu
+RUN useradd -ms /bin/bash $user_name
+RUN echo "$user_name:$password" | chpasswd
+RUN adduser $user_name sudo
+# replace above with below for centos/fedora
+#RUN usermod $user_name -a -G wheel
+
+
+#
+#  **** Perform all root operations, e.g.,           ****
+#  **** "apt-get install" prior to the USER command. ****
+#
+USER $user_name
+ENV HOME /home/$user_name
+#
+# Install files in the user home directory
+#
+ADD $labdir/$imagedir/home_tar/home.tar $HOME
+# remove after docker fixes problem with empty tars
+RUN rm -f $HOME/home.tar
+ADD $labdir/$lab.tar.gz $HOME
+#
+#  The first thing that executes on the container.
+#
+USER root
+CMD ["/bin/bash", "-c", "exec /sbin/init --log-target=journal 3>&1"]
+

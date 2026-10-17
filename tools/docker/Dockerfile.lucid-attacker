@@ -1,0 +1,5 @@
+# Developer image for the traffic sources: the attacker (hping3, curl), the benign users
+# (benign_clients.py, python3) and the post-lab replay (tcpreplay).
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends hping3 curl tcpreplay iproute2 iputils-ping \
+    python3 procps && rm -rf /var/lib/apt/lists/*

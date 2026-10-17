@@ -1,0 +1,8 @@
+# Developer image for the tools in this folder (not the Labtainer image): runs the lab scripts with
+# plain Docker, serves the web pages and captures the traffic when the dataset is recorded.
+FROM python:3.11-slim-bookworm
+RUN apt-get update && echo "wireshark-common wireshark-common/install-setuid boolean false" | debconf-set-selections && \
+    apt-get install -y --no-install-recommends tshark tcpdump iptables iproute2 iputils-ping && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir numpy==1.26.4 matplotlib==3.11.2
