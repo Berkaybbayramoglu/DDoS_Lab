@@ -1,8 +1,9 @@
 #!/bin/bash
 # Step 13 (post-lab) – Start the simulated incident.
 #
-# Copies the replay files built by 12_build_replay.py to the traffic containers and starts them all
-# at once:  attacker1 <- replay/attacker1.pcap
+# Copies the replay files built by 12_build_replay.py to the traffic containers over SSH (with the
+# student's own key, post-lab step 0) and starts them all at once:
+#           attacker1 <- replay/attacker1.pcap
 #           attacker2 <- replay/attacker2.pcap  (peer address moved to attacker2's own)
 #           client    <- replay/benign.pcap     (legitimate traffic mixed in)
 # Start the live detector first (10_detect_block.py, other terminal), then run this script.
@@ -11,6 +12,9 @@
 #   usage:  ./13_launch_replay.sh [replay dir]
 set -eu
 DIR=${1:-replay}
+SUDO=$([ "$(id -u)" = 0 ] || echo sudo)
+USER_AT=ubuntu@                    # lab user on the traffic containers
+SSHO="-o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 -o LogLevel=ERROR"
 MAXSLEEP=0                         # ms; 0 = replay the timing as built by 12_build_replay.py
 [ -f "$DIR/manifest.txt" ] || { echo "no $DIR/manifest.txt - run 12_build_replay.py first"; exit 1; }
 VICTIM=$(sed -n 's/^victim=//p' "$DIR/manifest.txt")
@@ -22,18 +26,35 @@ VICTIM=$(sed -n 's/^victim=//p' "$DIR/manifest.txt")
 for host in attacker1 attacker2 client; do
   ip=$(getent hosts $host | awk '{print $1}')
   for rule in "-p tcp --tcp-flags RST RST" "-p icmp --icmp-type destination-unreachable"; do
-    sudo iptables -C OUTPUT -d "$ip" $rule -j DROP 2>/dev/null || sudo iptables -I OUTPUT -d "$ip" $rule -j DROP
+    $SUDO iptables -C OUTPUT -d "$ip" $rule -j DROP 2>/dev/null || $SUDO iptables -I OUTPUT -d "$ip" $rule -j DROP
   done
 done
 
-# each container replays its file with the recorded peer address(es) moved to its own address
+# The server reaches the traffic containers over SSH with the student's own key (post-lab step 0:
+# ssh-keygen + ssh-copy-id ubuntu@attacker1 / attacker2 / client). Check that first.
+for host in attacker1 attacker2 client; do
+  if ! ssh $SSHO "$USER_AT$host" true 2>/dev/null; then
+    echo "cannot log in to $host without a password. Set up SSH access first (post-lab step 0):"
+    echo "  ssh-keygen -t ed25519            # once, accept the defaults"
+    echo "  ssh-copy-id ubuntu@attacker1     # password: ubuntu"
+    echo "  ssh-copy-id ubuntu@attacker2"
+    echo "  ssh-copy-id ubuntu@client"
+    exit 1
+  fi
+done
+
+# each container replays its file with the recorded peer address(es) moved to its own address:
+# first every file is copied, then all three replays are started together
+for pair in attacker1:attacker1 attacker2:attacker2 client:benign; do
+  scp -q $SSHO "$DIR/${pair#*:}.pcap" "$USER_AT${pair%%:*}:${pair#*:}.pcap"
+done
 for pair in attacker1:attacker1 attacker2:attacker2 client:benign; do
   host=${pair%%:*}; name=${pair#*:}
   ip=$(getent hosts $host | awk '{print $1}')
   peers=$(sed -n "s/^peers_$name=//p" "$DIR/manifest.txt")
-  scp -q "$DIR/$name.pcap" "$host:$name.pcap"
-  ssh $host "MAXSLEEP=$MAXSLEEP sudo -E nohup bash replay_attack.sh $name.pcap $VICTIM $peers:$ip > replay.log 2>&1 &"
-  echo "  $host ($ip) <- $name.pcap   (recorded peer(s) $peers)"
+  ssh $SSHO "$USER_AT$host" \
+    "MAXSLEEP=$MAXSLEEP sudo -E nohup bash replay_attack.sh $name.pcap $VICTIM ${peers:+$peers:$ip} > replay.log 2>&1 &"
+  echo "  $host ($ip) <- $name.pcap   (recorded peer(s) ${peers:--})"
 done
 
 # Follow the replay on this screen: every flow is shown when its first packet goes out, on the

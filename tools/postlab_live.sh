@@ -3,10 +3,13 @@
 #   server   runs the student's model live (10_detect_block.py --block) on its own interface
 #   attacker1/2 replay their share of the held-out validation traffic (12_build_replay.py output)
 #   a benign client replays the validation benign traffic at the same time
-# After the replay the server writes the post-incident report (11_incident_report.py).
+# After the replay the server writes the post-incident report (11_incident_report.py) and the result
+# is checked: both attackers blocked, the client not blocked, recall >= 90 %, FPR <= 5 %.
+# The traffic containers start replay_attack.sh directly; the SSH hand-over of 13_launch_replay.sh
+# (student's own key) is exercised in Labtainer, not here.
 # Everything runs on an isolated Docker bridge; the only state changed is the server's own
 # iptables INPUT chain inside its container.
-#   usage: postlab_live.sh [model]
+#   usage: postlab_live.sh [model]      (exit code 0 = all checks passed)
 set -u
 MODEL=${1:-models/global_lucid.pt}
 D="docker --context default"
@@ -56,3 +59,17 @@ $D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONDONTWRITEBYTEC
 $D logs pl-server 2>/dev/null | tail -0
 $D rm -f pl-server pl-att1 pl-att2 pl-client >/dev/null 2>&1; $D network rm plnet >/dev/null
 echo "done -> server/results/incident_live.csv, server/results/incident_report.txt"
+grep -E "IPs blocked|First block|recall|FPR" "$SRV/results/incident_report.txt"
+python3 - "$SRV/results/incident_report.txt" "$A1" "$A2" "$CL" <<'PY'
+import re, sys
+text = open(sys.argv[1]).read()
+blocked = set(re.findall(r"^\s+- (\S+)$", text, re.M))
+recall = float(re.search(r"recall\): ([\d.]+) %", text).group(1))
+fpr = float(re.search(r"\(FPR\):\s+([\d.]+) %", text).group(1))
+checks = [("attacker1 blocked", sys.argv[2] in blocked), ("attacker2 blocked", sys.argv[3] in blocked),
+          ("client not blocked", sys.argv[4] not in blocked), (f"recall {recall} % >= 90 %", recall >= 90),
+          (f"FPR {fpr} % <= 5 %", fpr <= 5)]
+for name, ok in checks:
+    print(("PASS  " if ok else "FAIL  ") + name)
+sys.exit(0 if all(ok for _, ok in checks) else 1)
+PY

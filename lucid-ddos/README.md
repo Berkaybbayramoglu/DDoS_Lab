@@ -4,9 +4,10 @@ Every script is responsible for one learning outcome. It writes its output to a 
 `pipeline.json`) that the next script reads, so the whole pipeline can be reproduced from its
 parameters. Training and evaluation run single-threaded with seed 42 and deterministic PyTorch.
 
-This folder is a standard Labtainer lab. Before the first build, create the lab-only SSH key with
-`../tools/make_lab_key.sh`. To copy the lab into a Labtainer VM use `../tools/push_to_vm.sh`, then
-build and start it inside the VM with `rebuild lucid-ddos` (or labedit: Run → Build and run).
+This folder is a standard Labtainer lab. Students start it with `labtainer lucid-ddos`; the images
+are pulled from Docker Hub (`REGISTRY berkaybbayramoglu` in `config/start.config`, published by CI).
+To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` and build it there with
+`rebuild lucid-ddos` (or labedit: Run → Build and run).
 
 ## Labtainer layout
 
@@ -16,7 +17,6 @@ build and start it inside the VM with `rebuild lucid-ddos` (or labedit: Run → 
 | `dockerfiles/` | Based on `labtainer.network3` (Ubuntu 24.04, Python 3.12). Server: tshark, iptables, feh, PyTorch 2.6.0 CPU, numpy 1.26.4, matplotlib 3.11.2, `PYTHONHASHSEED=42`. Traffic containers: tcpreplay, hping3, curl |
 | `server/` | Scripts copied into the student's home directory (01–13, `check.py`, `lablib.py`) |
 | `server/home_tar/data/lab_traffic.pcap.gz` | The lab dataset (44 MB compressed, 947 MB uncompressed; tshark reads it directly). Kept in `home_tar/` so it is not collected as a student artifact |
-| `*/.ssh/` (generated, not in git) | Lab-only SSH key: the server pushes the replay files to the traffic containers. Created by `../tools/make_lab_key.sh`; `*/_bin/fixlocal.sh` sets its permissions |
 | `instr_config/` | Automatic assessment (`checkwork`) |
 | `docs/` | Student manual (to be written) |
 
@@ -88,9 +88,10 @@ model detects and blocks it live, and the student writes a post-incident report.
 
 | Order | Script | Job |
 | --- | --- | --- |
+| 0 | `ssh-keygen -t ed25519`, then `ssh-copy-id ubuntu@attacker1` / `attacker2` / `client` (password `ubuntu`) | The student sets up key-based SSH access from the server to the traffic containers, as an incident response team prepares its tooling. No key is shipped with the lab; `13_launch_replay.sh` checks the access and prints these commands if it is missing |
 | 1 | `12_build_replay.py` | Splits the validation flows into `attacker1` / `attacker2` / `benign` pcaps and writes `manifest.txt`. The flow start times are spread over 90 s in recorded order; the packets inside each flow keep their recorded timing |
 | 2 | `sudo python3 10_detect_block.py ... --iface eth0 --block --seconds 150` (terminal 1) | The server watches its own interface, classifies the flows and blocks attacker addresses with iptables. One `ALERT` line per attack flow, one `BLOCK` line per blocked address |
-| 3 | `./13_launch_replay.sh` (terminal 2) | Copies the pcaps to the three traffic containers over SSH, starts them together and shows every flow sent as a `SEND` line |
+| 3 | `./13_launch_replay.sh` (terminal 2) | Copies the pcaps to the three traffic containers over SSH (the student's key from step 0), starts them together and shows every flow sent as a `SEND` line |
 | 4 | `11_incident_report.py` | Post-incident report from the detection log: addresses, confidence intervals, recall/FPR, blocked addresses and time to block |
 
 Detector settings (`10_detect_block.py`):
@@ -175,8 +176,13 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
 - `config/about.txt` and `config/keywords.txt` are the lab description and keywords labedit asks
   for. The lab manual (`docs/lucid-ddos.pdf`) will be added with the student document.
 
-## Developer checks (plain Docker, see `../tools/`)
+## Developer checks and CI (plain Docker, see `../tools/` and `../.github/workflows/ci.yml`)
 
+- `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset.
 - `check_lab.sh`: runs the whole pipeline on 1 CPU and checks the stage scores, determinism and the
   normalization ordering (8/8, about 8 minutes).
-- `postlab_live.sh`: runs the same post-lab with plain Docker containers.
+- `train_default_model.sh` + `postlab_live.sh`: the post-lab with plain Docker containers; checks that
+  both attackers and only they are blocked, recall >= 90 %, FPR <= 5 %. The SSH hand-over of step 0 is
+  exercised in Labtainer, not here.
+- `build_labtainer_images.sh` + `smoke_labtainer_images.sh`: builds the four images the way Labtainer
+  does and checks their contents; on `main` CI then publishes them with `publish_images.sh`.

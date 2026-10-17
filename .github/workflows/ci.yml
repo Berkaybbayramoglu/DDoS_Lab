@@ -1,0 +1,84 @@
+name: CI
+
+# static          fast repository checks (syntax, secrets, English, Labtainer layout, labedit rules)
+# pipeline        the whole lab pipeline on 1 CPU: stage checks, determinism, normalization ordering
+# postlab         live detection + blocking against the replayed validation traffic, report checks
+# labtainer-images
+#                 builds the four Labtainer images as Labtainer does and checks their contents;
+#                 on main (after all other jobs passed) publishes them to Docker Hub
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/static_checks.py
+
+  pipeline:
+    needs: static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build developer images
+        run: tools/build_images.sh
+      - name: Lab pipeline (stage checks, determinism, normalization ordering)
+        run: |
+          tools/check_lab.sh | tee check_lab.log
+          grep -q "0 failed" check_lab.log
+
+  postlab:
+    needs: static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build developer images
+        run: tools/build_images.sh
+      - name: Train the default model
+        run: tools/train_default_model.sh
+      - name: Live detection and blocking (post-lab)
+        run: tools/postlab_live.sh
+      - name: Keep the detection log and the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postlab-report
+          path: |
+            lucid-ddos/server/results/detect.log
+            lucid-ddos/server/results/incident_report.txt
+          if-no-files-found: ignore
+
+  labtainer-images:
+    needs: [static, pipeline, postlab]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space for the Labtainer base images
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Build the Labtainer images (as Labtainer's buildImage.sh)
+        run: tools/build_labtainer_images.sh
+      - name: Check the image contents
+        run: tools/smoke_labtainer_images.sh
+      - name: Log in to Docker Hub
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Publish to Docker Hub
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        run: tools/publish_images.sh "$DOCKERHUB_USERNAME" "${GITHUB_SHA::7}"

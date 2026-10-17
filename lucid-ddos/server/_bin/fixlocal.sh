@@ -16,8 +16,3 @@
 #   PERMLOCKDIR=/var/labtainer/did_param
 #   echo $1 | sudo -S mkdir -p "$PERMLOCKDIR"
 
-
-# lab-only SSH key (server -> traffic containers, used by 13_launch_replay.sh): sshd and ssh insist
-# on private permissions
-chmod 700 $HOME/.ssh
-chmod 600 $HOME/.ssh/*

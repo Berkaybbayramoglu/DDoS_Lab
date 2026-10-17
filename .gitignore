@@ -1,5 +1,3 @@
-# lab-only SSH key: generated per machine with tools/make_lab_key.sh, never committed
-lucid-ddos/*/.ssh/
 
 # files Labtainer generates when it builds the lab
 *.tar
