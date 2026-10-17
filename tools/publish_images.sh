@@ -5,12 +5,22 @@
 #                                                  config/start.config), plus :<version> and
 #                                                  :base_image<base id> (as Labtainer's relabel.sh)
 #   <user>/ddos_lab:<container>                    all four in one repository, plus :<container>-<version>
-# Needs a prior `docker login`.
+# Needs a prior `docker login`. Every push is retried (Docker Hub answers 502/503 now and then);
+# a publish that still fails stops with an error, so CI never reports a half-published set as done.
 #   usage: publish_images.sh <docker hub user> [version tag]
 set -eu
 USER_NS=${1:?usage: publish_images.sh <docker hub user> [version tag]}
 VERSION=${2:-}
 D="docker --context default"
+push() {   # push <tag>, up to 4 attempts
+  local n
+  for n in 1 2 3 4; do
+    $D push -q "$1" >/dev/null && return 0
+    echo "push of $1 failed (attempt $n), retrying in $((n * 15)) s" >&2
+    sleep $((n * 15))
+  done
+  return 1
+}
 for c in server attacker1 attacker2 client; do
   img=lucid-ddos.$c.student
   base_id=$($D inspect --format '{{index .Config.Labels "base"}}' "$img"); base_id=${base_id##*.}
@@ -18,7 +28,7 @@ for c in server attacker1 attacker2 client; do
   [ -n "$VERSION" ] && targets="$targets $USER_NS/$img:$VERSION $USER_NS/ddos_lab:$c-$VERSION"
   for t in $targets; do
     $D tag "$img" "$t"
-    $D push -q "$t" >/dev/null
+    push "$t"
     echo "pushed $t"
   done
 done
