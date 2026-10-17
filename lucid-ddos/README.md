@@ -34,7 +34,7 @@ To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` an
 | 6 | `06_train.py` | Training the 2D CNN (fixed epochs, no validation) | `models/*.pt` |
 | 7 | `07_infer.py` | Inference with a saved model (only parameters are given) | `results/*.csv` |
 | 8 | `08_evaluate.py` | Metrics + 95 % bootstrap confidence intervals; appends to a registry | `results/registry.json` |
-| 9 | `09_plot.py` | Comparison figure per experiment + confidence interval table (open with `feh`) | `results/plots/` |
+| 9 | `09_plot.py` | Comparison figure per experiment + confidence interval table (view with `feh -. results/plots/figure1_normalization.png`; `-.` fits the figure to the window) | `results/plots/` |
 | – | `check.py` | Checks the rules of every preprocessing step independently | table on screen |
 
 ```bash

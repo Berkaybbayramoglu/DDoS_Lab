@@ -48,12 +48,14 @@ done
 for pair in attacker1:attacker1 attacker2:attacker2 client:benign; do
   scp -q $SSHO "$DIR/${pair#*:}.pcap" "$USER_AT${pair%%:*}:${pair#*:}.pcap"
 done
+# this server's MAC address on the lab network, so the senders need no ping to find it
+MYMAC=$(cat /sys/class/net/"$(ip -o route get "$(getent hosts attacker1 | awk '{print $1}')" | sed -n 's/.* dev \([^ ]*\).*/\1/p')"/address)
 for pair in attacker1:attacker1 attacker2:attacker2 client:benign; do
   host=${pair%%:*}; name=${pair#*:}
   ip=$(getent hosts $host | awk '{print $1}')
   peers=$(sed -n "s/^peers_$name=//p" "$DIR/manifest.txt")
   ssh $SSHO "$USER_AT$host" \
-    "MAXSLEEP=$MAXSLEEP sudo -E nohup bash replay_attack.sh $name.pcap $VICTIM ${peers:+$peers:$ip} > replay.log 2>&1 &"
+    "VMAC=$MYMAC MAXSLEEP=$MAXSLEEP sudo -E nohup bash replay_attack.sh $name.pcap $VICTIM ${peers:+$peers:$ip} > replay.log 2>&1 &"
   echo "  $host ($ip) <- $name.pcap   (recorded peer(s) ${peers:--})"
 done
 

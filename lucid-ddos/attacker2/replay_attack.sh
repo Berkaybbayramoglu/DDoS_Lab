@@ -15,7 +15,9 @@ set -eu
 PCAP=$1; VICTIM=$2; MAP=${3:-}
 MAXSLEEP=${MAXSLEEP:-0}
 IFACE=$(ip -o route get "$VICTIM" | sed -n 's/.* dev \([^ ]*\).*/\1/p')   # lab LAN has no default route
-VMAC=$(ping -c1 -W2 "$VICTIM" >/dev/null 2>&1; ip neigh show "$VICTIM" | awk '{print $5; exit}')
+# the server's MAC address comes from the launcher (VMAC); only without it is it looked up with a
+# ping, which would add an ICMP flow to the traffic the detector sees
+VMAC=${VMAC:-$(ping -c1 -W2 "$VICTIM" >/dev/null 2>&1; ip neigh show "$VICTIM" | awk '{print $5; exit}')}
 SMAC=$(cat /sys/class/net/"$IFACE"/address)
 PLAY=/tmp/replay.pcap
 REWRITE=(--enet-smac="$SMAC" --enet-dmac="$VMAC" --mtu-trunc --fixcsum)

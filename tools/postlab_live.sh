@@ -39,14 +39,15 @@ $D run -d --name pl-server --network plnet --ip $VIC --cpus=2 --cap-add NET_RAW 
    "$QUIET mkdir -p results && python3 10_detect_block.py --model $MODEL --iface eth0 --victim $VIC --block \
     --seconds 150 --out results/incident_live.csv > results/detect.log 2>&1" >/dev/null
 sleep 20                                            # let tshark come up before traffic starts
+VMAC="-e VMAC=$($D inspect -f '{{range .NetworkSettings.Networks}}{{.MacAddress}}{{end}}' pl-server)"  # no ARP ping
 REP="-v $SRV/replay:/srv_replay:ro"                 # the replay pcaps, shared read-only
 # each container mounts only its own lab folder and runs its own replay_attack.sh, with the
 # recorded peer address(es) moved to its own address
-$D run -d --name pl-att1 --network plnet --ip $A1 --cap-add NET_RAW --cap-add NET_ADMIN -v "$ATT/attacker1":/home/student $REP \
+$D run -d --name pl-att1 --network plnet --ip $A1 --cap-add NET_RAW --cap-add NET_ADMIN $VMAC -v "$ATT/attacker1":/home/student $REP \
    -w /home/student lucid-attacker bash replay_attack.sh /srv_replay/attacker1.pcap $VIC "$(peer attacker1):$A1" >/dev/null
-$D run -d --name pl-att2 --network plnet --ip $A2 --cap-add NET_RAW --cap-add NET_ADMIN -v "$ATT/attacker2":/home/student $REP \
+$D run -d --name pl-att2 --network plnet --ip $A2 --cap-add NET_RAW --cap-add NET_ADMIN $VMAC -v "$ATT/attacker2":/home/student $REP \
    -w /home/student lucid-attacker bash replay_attack.sh /srv_replay/attacker2.pcap $VIC "$(peer attacker2):$A2" >/dev/null
-$D run -d --name pl-client --network plnet --ip $CL --cap-add NET_RAW --cap-add NET_ADMIN -v "$ATT/client":/home/student $REP \
+$D run -d --name pl-client --network plnet --ip $CL --cap-add NET_RAW --cap-add NET_ADMIN $VMAC -v "$ATT/client":/home/student $REP \
    -w /home/student lucid-attacker bash replay_attack.sh /srv_replay/benign.pcap $VIC "$(peer benign):$CL" >/dev/null
 
 echo "replay started (attacker1=$A1, attacker2=$A2, client=$CL -> victim=$VIC); waiting for the server window..."
