@@ -50,9 +50,9 @@ def bootstrap(y, p, n=1000):
 
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    a.add_argument("--pred", required=True, help="CSV written by 07_infer.py")
+    a.add_argument("--pred", required=True, help="CSV written by 07_infer.py (or 14_classical.py)")
     a.add_argument("--name", required=True, help="name of this run (shown in plots)")
-    a.add_argument("--group", default="other", help="experiment group, e.g. normalization, features, shape, live")
+    a.add_argument("--group", default="other", help="experiment group, e.g. normalization, features, shape, classical")
     a.add_argument("--model", help="model file the predictions came from (links its training log for 09_plot.py)")
     a.add_argument("--registry", default="results/registry.json")
     args = a.parse_args()
@@ -76,8 +76,10 @@ def main():
             reg = json.load(fh)
     reg = [r for r in reg if not (r["name"] == args.name and r["group"] == args.group)]   # re-run replaces
     log = os.path.splitext(args.model)[0] + "_train_log.json" if args.model else None
+    sweep_file = args.pred + ".sweep.json"                    # written by 14_classical.py
+    sweep = json.load(open(sweep_file)) if os.path.exists(sweep_file) else None
     reg.append({"name": args.name, "group": args.group, "pred": args.pred, "samples": len(y),
-                "train_log": log if log and os.path.exists(log) else None,
+                "train_log": log if log and os.path.exists(log) else None, "sweep": sweep,
                 "point": {m: point[m] for m in METRICS}, "ci": ci,
                 "confusion": {k: point[k] for k in ("tp", "fp", "tn", "fn")}})
     os.makedirs(os.path.dirname(args.registry) or ".", exist_ok=True)

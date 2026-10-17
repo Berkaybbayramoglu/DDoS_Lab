@@ -37,6 +37,26 @@ import sys;sys.exit(0 if all(torch.equal(a[k],b[k]) for k in a) else 1)
 PY
 $R sh -c "cmp -s $W/p1.csv $W/p2.csv" && ok "inference deterministic (same predictions twice)" || bad "inference deterministic"
 
+echo "== classical detector (14) and explanation (15)"
+$R sh -c "python3 14_classical.py --flows $W/02 --rule syn --split test --out $W/c1.csv >/dev/null &&
+          python3 14_classical.py --flows $W/02 --rule syn --split test --bots 50 --out $W/c50.csv >/dev/null &&
+          python3 15_explain.py --model $W/m.pt --data $W/05 --repeats 2 --out $W/x.csv > $W/x.txt" 2>/dev/null
+$R python3 - <<'PY' 2>/dev/null && ok "classical rule: perfect on one attacker, recall <= 10 % with 50 bots" || bad "classical rule"
+import csv, sys
+def rec(f):
+    r = [x for x in csv.DictReader(open(f)) if x["label"] == "1"]; return sum(x["pred"] == "1" for x in r) / len(r)
+def fpr(f):
+    r = [x for x in csv.DictReader(open(f)) if x["label"] == "0"]; return sum(x["pred"] == "1" for x in r) / len(r)
+w = "/srv/work/.check/"
+sys.exit(0 if rec(w + "c1.csv") >= 0.99 and fpr(w + "c1.csv") <= 0.01 and rec(w + "c50.csv") <= 0.10 else 1)
+PY
+$R python3 - <<'PY' 2>/dev/null && ok "explanation: most important feature is a header field with a real accuracy drop" || bad "explanation"
+import csv, sys
+r = list(csv.DictReader(open("/srv/work/.check/x.csv")))
+sys.exit(0 if r[0]["feature"] not in ("src_ip", "dst_ip", "src_port", "dst_port") and float(r[0]["accuracy_drop"]) > 0.05 else 1)
+PY
+rm -f "$SRV/results/plots/explain_m.png"
+
 echo "== normalization experiment: final training loss raw > theoretical > global"
 rm -f "$SRV/results/registry_check.json"
 for m in none theoretical global batchnorm; do

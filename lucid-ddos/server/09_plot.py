@@ -1,11 +1,12 @@
 """Step 9 – Compare runs in a figure (for the written analysis).
 
 Learning outcome: reading a chart with confidence intervals and explaining a difference.
-For every experiment group (normalization, features, shape, live, ...) one figure is drawn from
+For every experiment group (normalization, features, shape, classical, ...) one figure is drawn from
 results/registry.json (written by 08_evaluate.py):
   left    test accuracy, F1 and false-positive rate of every run; the error bars are the 95 %
           bootstrap confidence intervals
-  middle  training loss per epoch (log scale), if the run was linked to its model
+  middle  training loss per epoch (log scale), if the run was linked to its model; for the
+          classical rules of 14_classical.py the recall and false-positive rate of every threshold
   right   table: mean, median and 95 % CI of accuracy, F1 and FPR for every run
 The same table is printed on the screen. Figures are numbered in the order the groups are given.
 
@@ -38,7 +39,7 @@ def figure(k, group, runs, out_dir):
         hi = [100 * (r["ci"][m]["ci_high"] - r["point"][m]) for r in runs]
         ax.bar(xs, vals, width, yerr=[lo, hi], capsize=3, label=label)
         for x, v in zip(xs, vals):
-            ax.text(x, v + 2, f"{v:.1f}", ha="center", fontsize=7)
+            ax.text(x, v + 2, f"{v:.0f}" if v in (0, 100) else f"{v:.1f}", ha="center", fontsize=7)
     ax.set_xticks(range(len(runs)))
     ax.set_xticklabels(names, fontsize=8)
     ax.set_ylim(0, 125)
@@ -48,7 +49,19 @@ def figure(k, group, runs, out_dir):
 
     ax2 = fig.add_subplot(gs[1])
     drew, seen = False, set()
-    for r in runs:                                     # one curve per model (several runs may share one)
+    sweeps = [r for r in runs if r.get("sweep")]
+    if sweeps:                                         # classical rules: recall / FPR for every threshold
+        for i, r in enumerate(sweeps):
+            sw = r["sweep"]; pts = sw["points"]; c = f"C{i}"
+            ax2.plot([q["threshold"] for q in pts], [100 * q["recall"] for q in pts], color=c, label=f"{r['name']}: recall")
+            ax2.plot([q["threshold"] for q in pts], [100 * q["fpr"] for q in pts], color=c, ls="--", label=f"{r['name']}: FPR")
+            ax2.axvline(sw["threshold"], color=c, ls=":", lw=1)
+        ax2.set_xscale("log")
+        ax2.set_xlabel("threshold (per source, per second; dotted = chosen)")
+        ax2.set_ylabel("% (evaluated split)")
+        ax2.set_title(f"Figure {k}b – threshold sweep of the classical rules")
+        ax2.legend(fontsize=7)
+    for r in ([] if sweeps else runs):                 # one curve per model (several runs may share one)
         log = r.get("train_log")
         if log and os.path.exists(log) and log not in seen:
             seen.add(log)
@@ -56,14 +69,15 @@ def figure(k, group, runs, out_dir):
             label = os.path.basename(log).replace("_train_log.json", "")
             ax2.plot([e[0] for e in ep], [max(float(e[1]), 1e-6) for e in ep], marker="o", ms=3, label=label)
             drew = True
-    ax2.set_yscale("log")
-    ax2.set_xlabel("epoch")
-    ax2.set_ylabel("training loss (log scale)")
-    ax2.set_title(f"Figure {k}b – training loss")
-    if drew:
-        ax2.legend(fontsize=8)
-    else:
-        ax2.text(0.5, 0.5, "no training logs linked", ha="center", transform=ax2.transAxes)
+    if not sweeps:
+        ax2.set_yscale("log")
+        ax2.set_xlabel("epoch")
+        ax2.set_ylabel("training loss (log scale)")
+        ax2.set_title(f"Figure {k}b – training loss")
+        if drew:
+            ax2.legend(fontsize=8)
+        else:
+            ax2.text(0.5, 0.5, "no training logs linked", ha="center", transform=ax2.transAxes)
 
     ax3 = fig.add_subplot(gs[2])
     ax3.axis("off")

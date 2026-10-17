@@ -48,7 +48,7 @@ cd $LABTAINER_DIR/scripts/labtainer-student && rebuild lucid-ddos
 ```bash
 tools/static_checks.py         # syntax, secrets, English only, Labtainer layout, labedit rules, dataset
 tools/build_images.sh          # developer images lucid-server, lucid-attacker, lucid-ethtool
-tools/check_lab.sh             # whole pipeline on 1 CPU: stage checks, determinism, normalization ordering
+tools/check_lab.sh             # whole pipeline on 1 CPU: stage checks, determinism, normalization, classical, explanation
 tools/train_default_model.sh   # model for the post-lab test
 tools/postlab_live.sh          # post-lab: detection, blocking and report checks
 tools/build_labtainer_images.sh   # the four Labtainer images, built as Labtainer builds them

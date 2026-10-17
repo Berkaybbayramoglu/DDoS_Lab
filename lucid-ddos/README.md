@@ -39,6 +39,8 @@ a model prepared differently from the data (window, flows, normalization, featur
 | 7 | `07_infer.py` | Inference with a saved model (only parameters are given) | `results/*.csv` |
 | 8 | `08_evaluate.py` | Metrics + 95 % bootstrap confidence intervals; appends to a registry | `results/registry.json` |
 | 9 | `09_plot.py` | Comparison figure per experiment + confidence interval table (view with `feh -. results/plots/figure1_normalization.png`; `-.` fits the figure to the window) | `results/plots/` |
+| 14 | `14_classical.py` | Classical detection: a per-source threshold (SYN or packets per second in a window), tuned on the training split; `--bots K` spreads the attack over K bot addresses | `results/classical_*.csv` (+ `.sweep.json`) |
+| 15 | `15_explain.py` | What the model relies on (permutation importance) and where it fails (errors by flow length) | `results/explain_*.csv`, `results/plots/explain_*.png` |
 | – | `check.py` | Checks the rules of every preprocessing step independently | table on screen |
 
 ```bash
@@ -76,8 +78,21 @@ for n in 3 10 50 100; do
   python3 08_evaluate.py --pred results/global_lucid_n$n.csv --name n=$n --group shape --model models/global_lucid_n$n.pt
 done
 
-# Three comparison figures + confidence interval tables
-python3 09_plot.py --groups normalization features shape
+# Classical detection vs. LUCID (results/global_lucid_test.csv comes from the feature experiment;
+# the rule is tuned on the training split; --bots 50 = the same attack from 50 bots)
+python3 08_evaluate.py  --pred results/global_lucid_test.csv --name "LUCID CNN" --group classical --model models/global_lucid.pt
+python3 14_classical.py --flows work/02_flows --rule syn --split test --out results/classical_syn.csv
+python3 08_evaluate.py  --pred results/classical_syn.csv --name "syn threshold" --group classical
+python3 14_classical.py --flows work/02_flows --rule syn --split test --bots 50 --out results/classical_syn_bots50.csv
+python3 08_evaluate.py  --pred results/classical_syn_bots50.csv --name "syn threshold (50 bots)" --group classical
+
+# Comparison figures + confidence interval tables
+python3 09_plot.py --groups normalization features shape classical
+
+# What the models rely on and where they fail
+python3 15_explain.py --model models/global_lucid.pt     --data work/05_shape_global_lucid
+python3 15_explain.py --model models/global_lucid_ids.pt --data work/05_shape_global_lucid_ids
+python3 15_explain.py --model models/global_lucid_n3.pt  --data work/05_shape_global_lucid_n3
 ```
 
 Measured (test split of 4,260 samples): normalization raw 99.9 % · theoretical / global / batchnorm
@@ -85,6 +100,17 @@ Measured (test split of 4,260 samples): normalization raw 99.9 % · theoretical 
 100 %. Feature selection (accuracy, test → test_newaddr): `lucid` 100 % → 100 % · `lucid_ids` 100 % →
 52.9 % · `ids_only` 100 % → 1.4 %. On the normal test split all three look perfect; once the addresses
 change, only the address-free LUCID features hold up (shortcut learning).
+
+Classical detection (test split): the SYN-rate threshold chosen on the training split (54 SYN/s; benign
+sources reach at most 3.4 SYN/s, the attacker at least 105) is perfect while the attack comes from one
+address. Spread over 50 bots, every bot stays near 3 SYN/s, inside the benign range: the tuned threshold
+catches nothing (recall 0 %) and no threshold separates the two (best: recall 51 % at 10.5 % FPR, see
+the sweep in Figure 4b). LUCID judges each flow without addresses, so its decisions do not change.
+
+Explanation (`15_explain.py`): the LUCID model relies on tcp_win, packet_len, tcp_len and highest_layer
+(accuracy drop 14–19 points each when shuffled); the lucid_ids model relies only on src_ip (36 points);
+the n = 3 model misses all 1,056 HTTP-flood flows longer than 10 packets, whose first 3 packets look like
+benign HTTP.
 
 ## Post-lab (server + attacker1 + attacker2 + client)
 
@@ -163,7 +189,7 @@ every type). To regenerate: `../tools/build_lab_dataset.sh` (about 20 minutes).
 - The same results come out on the host (plain Docker) and in the VM, run for run.
 - Time: one training (34,506 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
-  lab part takes about 11 min of machine time, the post-lab about 3 min.
+  lab part takes about 13 min of machine time, the post-lab about 3 min.
 - Post-lab (run twice in a row in Labtainer): replay of about 3,500 validation flows (one sample per
   flow; 45 + 46 + 241 duplicate samples left out) in about 70 s; both attackers blocked a few seconds
   after the first attack flow, the benign client not blocked. Recall 100 %, FPR 0 %; no flow of the
@@ -176,6 +202,8 @@ every type). To regenerate: `../tools/build_lab_dataset.sh` (about 20 minutes).
 | `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass`" |
 | `normalization_compared`, `features_compared`, `shape_compared` | `09_plot.py` stdout (one figure per experiment) |
 | `address_swap_tested` | `07_infer.py` was run on the `test_newaddr` split |
+| `classical_tested`, `classical_compared` | `14_classical.py` was run with `--bots`; `09_plot.py` drew the classical figure |
+| `decisions_explained` | `15_explain.py` printed a permutation importance |
 | `incident_report`, `attacker1_blocked`, `attacker2_blocked` | `results/incident_report.txt` |
 | `only_attackers_blocked` | Both attackers listed and exactly 2 addresses blocked (the client was not) |
 
@@ -196,7 +224,7 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
 
 - `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset.
 - `check_lab.sh`: runs the whole pipeline on 1 CPU and checks the stage scores, determinism and the
-  normalization ordering (8/8, about 8 minutes).
+  normalization ordering, classical rule and explanation (10/10, about 9 minutes).
 - `train_default_model.sh` + `postlab_live.sh`: the post-lab with plain Docker containers; checks that
   both attackers and only they are blocked, recall >= 90 %, FPR <= 5 %. The SSH hand-over of step 0 is
   exercised in Labtainer, not here.
