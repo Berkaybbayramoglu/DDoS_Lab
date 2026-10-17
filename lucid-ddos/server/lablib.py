@@ -95,7 +95,8 @@ def int_to_ip(i):
 def tshark_command(pcap=None, iface=None, reset=None):
     """reset: let tshark drop its per-packet state every N packets (memory stays flat on big files);
     tshark then restarts frame.number, so the caller numbers the lines itself."""
-    src = ["-r", pcap] if pcap else ["-i", iface, "-l"]
+    # live: the lab's SSH channel (server -> traffic containers, 13_launch_replay.sh) is not monitored
+    src = ["-r", pcap] if pcap else ["-i", iface, "-l", "-f", "not tcp port 22"]
     src += ["-M", str(reset)] if reset else []
     cmd = ["tshark", "-n", "-Q"] + src + ["-T", "fields", "-E", "separator=\t", "-E", "occurrence=a"]
     for f in TSHARK_FIELDS:
@@ -238,6 +239,29 @@ def load_npz(path):
     decompresses the whole array again on every access.)"""
     with np.load(path) as z:
         return {k: z[k] for k in z.files}
+
+
+def fingerprint(*arrays):
+    """Short content id of some arrays (to notice that an earlier step was re-run)."""
+    h = hashlib.sha1()
+    for a in arrays:
+        h.update(np.ascontiguousarray(a).tobytes())
+    return h.hexdigest()[:16]
+
+
+def packets_id(p):
+    return fingerprint(p["frame"], p["ts"], p["window"])
+
+
+def flows_id(f):
+    return fingerprint(f["key"], f["split"], f["label"], f["selected"])
+
+
+def require_same(pipe, key, value, what, rerun):
+    """Stop when the output of an earlier step changed after this pipeline was built from it."""
+    if key in pipe and pipe[key] != value:
+        raise SystemExit(f"{what} changed after this pipeline was built from it (an earlier step was "
+                         f"re-run). Run {rerun} again.")
 
 
 def load_pipeline(folder):

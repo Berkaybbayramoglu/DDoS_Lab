@@ -34,9 +34,15 @@ def swapped_address_features(pipe, f, sample_sorted_order, columns):
     keep = np.flatnonzero(f["selected"][f["sample_of_packet"]])[sample_sorted_order]  # as in 03_normalize.py
     victims = {lablib.ip_to_int(x) for x in pipe["victims"]}
     attackers = sorted({lablib.ip_to_int(x) for x in pipe["attackers"]})
+    # benign clients = unicast hosts that talked to a victim in the test split (no gateway noise,
+    # no multicast addresses)
     test = f["split"] == "test"
-    ends = np.concatenate([f["key"][test, 0], f["key"][test, 2]])
-    benign = sorted({int(x) for x in ends} - victims - set(attackers))
+    a, b = f["key"][test, 0], f["key"][test, 2]
+    to_victim = np.isin(a, list(victims)) | np.isin(b, list(victims))
+    ends = np.concatenate([a[to_victim], b[to_victim]])
+    benign = sorted({int(x) for x in ends if not 224 <= int(x) >> 24 <= 239} - victims - set(attackers))
+    if not benign or not attackers:
+        return None
     swap = {}
     for i, a in enumerate(attackers):                 # attacker -> a benign client's address ...
         swap[a] = benign[i % len(benign)]
@@ -67,6 +73,7 @@ def main():
     pipe = lablib.load_pipeline(args.inp)
     d = lablib.load_npz(os.path.join(args.inp, "features.npz"))
     f = lablib.load_npz(os.path.join(pipe["flow_dir"], "flows.npz"))
+    lablib.require_same(pipe, "flows_id", lablib.flows_id(f), pipe["flow_dir"], "03_normalize.py, 04_features.py and 05_shape.py")
     X, sample = d["X"], d["sample"]
     n, nf = args.packets, X.shape[1]
 
@@ -106,6 +113,8 @@ def main():
     if swapped:
         pairs = ", ".join(f"{lablib.int_to_ip(a)} -> {lablib.int_to_ip(b)}" for a, b in swapped[1].items())
         print(f"test_newaddr: addresses swapped ({pairs})")
+    elif any(c in ("src_ip", "dst_ip") for c in columns):
+        print("test_newaddr: no benign client address in the test split to swap with -> identical to test")
     else:
         print("test_newaddr: no IP address among the features -> identical to test")
     print(f"-> written to {args.out}")

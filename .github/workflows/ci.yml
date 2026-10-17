@@ -15,7 +15,7 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}   # never stop a publish on main half way
 
 jobs:
   static:
@@ -34,9 +34,7 @@ jobs:
       - name: Build developer images
         run: tools/build_images.sh
       - name: Lab pipeline (stage checks, determinism, normalization ordering)
-        run: |
-          tools/check_lab.sh | tee check_lab.log
-          grep -q "0 failed" check_lab.log
+        run: tools/check_lab.sh
 
   postlab:
     needs: static

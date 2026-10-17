@@ -25,6 +25,10 @@ VICTIM=$(sed -n 's/^victim=//p' "$DIR/manifest.txt")
 # part of the recording (and changing what the detector sees).
 for host in attacker1 attacker2 client; do
   ip=$(getent hosts $host | awk '{print $1}')
+  # a new incident starts clean: remove the DROP rules a previous detector run added for this host
+  while $SUDO iptables -C INPUT -s "$ip" -j DROP 2>/dev/null; do
+    $SUDO iptables -D INPUT -s "$ip" -j DROP && echo "  removed the block of $host ($ip) from a previous run"
+  done
   for rule in "-p tcp --tcp-flags RST RST" "-p icmp --icmp-type destination-unreachable"; do
     $SUDO iptables -C OUTPUT -d "$ip" $rule -j DROP 2>/dev/null || $SUDO iptables -I OUTPUT -d "$ip" $rule -j DROP
   done
@@ -33,12 +37,17 @@ done
 # The server reaches the traffic containers over SSH with the student's own key (post-lab step 0:
 # ssh-keygen + ssh-copy-id ubuntu@attacker1 / attacker2 / client). Check that first.
 for host in attacker1 attacker2 client; do
-  if ! ssh $SSHO "$USER_AT$host" true 2>/dev/null; then
-    echo "cannot log in to $host without a password. Set up SSH access first (post-lab step 0):"
-    echo "  ssh-keygen -t ed25519            # once, accept the defaults"
-    echo "  ssh-copy-id ubuntu@attacker1     # password: ubuntu"
-    echo "  ssh-copy-id ubuntu@attacker2"
-    echo "  ssh-copy-id ubuntu@client"
+  if ! err=$(ssh $SSHO "$USER_AT$host" true 2>&1); then
+    if echo "$err" | grep -qi "permission denied"; then
+      echo "cannot log in to $host without a password. Set up SSH access first (post-lab step 0):"
+      echo "  ssh-keygen -t ed25519            # once, accept the defaults"
+      echo "  ssh-copy-id ubuntu@attacker1     # password: ubuntu"
+      echo "  ssh-copy-id ubuntu@attacker2"
+      echo "  ssh-copy-id ubuntu@client"
+    else
+      echo "cannot reach $host over SSH: ${err:-no answer}"
+      echo "  is the lab running (labtainer lucid-ddos)? check with: ping -c1 $host"
+    fi
     exit 1
   fi
 done

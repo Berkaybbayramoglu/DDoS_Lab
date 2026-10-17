@@ -22,6 +22,10 @@ To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` an
 | `instr_config/` | Automatic assessment (`checkwork`) |
 | `docs/` | Student manual (to be written) |
 
+Every step records a fingerprint of its input in `pipeline.json`; if an earlier step is re-run with
+other parameters, the later steps stop and say which steps to run again, and `07_infer.py` refuses
+a model prepared differently from the data (window, flows, normalization, features, n).
+
 ## Lab workflow (server terminal)
 
 | # | Script | Learning outcome | Output |
@@ -79,7 +83,7 @@ python3 09_plot.py --groups normalization features shape
 Measured (test split of 4,260 samples): normalization raw 99.9 % · theoretical / global / batchnorm
 100 % (the difference shows in the training loss, see below); shaping n = 3 75.2 % · n = 10 / 50 / 100
 100 %. Feature selection (accuracy, test → test_newaddr): `lucid` 100 % → 100 % · `lucid_ids` 100 % →
-37.4 % · `ids_only` 100 % → 1.4 %. On the normal test split all three look perfect; once the addresses
+52.9 % · `ids_only` 100 % → 1.4 %. On the normal test split all three look perfect; once the addresses
 change, only the address-free LUCID features hold up (shortcut learning).
 
 ## Post-lab (server + attacker1 + attacker2 + client)
@@ -104,6 +108,12 @@ Detector settings (`10_detect_block.py`):
   judged. Otherwise half-open benign connections look like a SYN flood and get blocked.
 - `--min-alerts 3`: an address is blocked only after 3 of its flows were flagged, so a single false
   alarm does not cut a legitimate host off; the alarm still appears in the report.
+- Only flows of the protected host are judged; the lab's SSH channel (port 22, used by
+  `13_launch_replay.sh`) is not captured. Live capture and blocking need `sudo`; `--block` is
+  refused with `--pcap` (offline analysis never changes the firewall).
+- `--seconds` counts from the detector's start: start `13_launch_replay.sh` within about 30 s.
+- Re-running the incident: `13_launch_replay.sh` first removes the DROP rules a previous detector
+  run left for attacker1, attacker2 and client.
 
 Replay details (`13_launch_replay.sh`, `*/replay_attack.sh`):
 
@@ -115,6 +125,11 @@ Replay details (`13_launch_replay.sh`, `*/replay_attack.sh`):
   move to the replaying container's own address, the server's address stays the same.
 - **No gap capping by default.** Because `12_build_replay.py` already packs the flows into about 90 s,
   tcpreplay plays the file's timing as it is (`MAXSLEEP=0`).
+- **One sample per flow.** `12_build_replay.py` keeps one sample per flow as the server will see it,
+  so samples of the same 5-tuple from different recorded windows, and benign clients that used the
+  same source port, do not merge into one flow in the 90 s replay.
+- **No extra packets.** The launcher passes the server's MAC address to the senders, so they do not
+  ping it (which would add ICMP flows).
 
 ## Dataset
 
@@ -149,11 +164,10 @@ every type). To regenerate: `../tools/build_lab_dataset.sh` (about 20 minutes).
 - Time: one training (34,506 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
   lab part takes about 11 min of machine time, the post-lab about 3 min.
-- Post-lab: replay of 3,511 validation flows in about 70 s; both attackers blocked 5 s after the
-  first attack flow, the benign client not blocked. Recall 96.0 %, FPR 0.1 % (1 benign flow). The
-  missed attack flows got an ALERT during the window but were judged benign when it closed: packing
-  the replay into 90 s merges flows of the two SYN sessions that reuse the same source ports
-  (a replay artefact).
+- Post-lab (run twice in a row in Labtainer): replay of about 3,500 validation flows (one sample per
+  flow; 45 + 46 + 241 duplicate samples left out) in about 70 s; both attackers blocked a few seconds
+  after the first attack flow, the benign client not blocked. Recall 100 %, FPR 0 %; no flow of the
+  SSH channel in the detection log; the second run removed the blocks of the first one.
 
 ## Assessment (`instr_config/`)
 

@@ -77,10 +77,9 @@ def main():
         out(f"   Attack window .......... {ts(t0)} - {ts(t1)} ({t1 - t0:.0f} s)")
         out(f"   Distinct source IPs .... {len({r['peer_ip'] for r in attack})}")
         out(f"   IPs blocked ............ {len({r['peer_ip'] for r in rows if r['blocked'] == 'yes'})}")
-        bt = [float(r["block_time"]) for r in rows if r.get("block_time")]
+        bt = [float(r["block_time"]) for r in rows if r.get("block_time") and r["blocked"] == "yes"]
         if bt:
-            first = min(r["time"] for r in rows if r.get("block_time"))
-            out(f"   First block ............ {ts(min(bt))} ({min(bt) - first:.0f} s after the first attack flow)")
+            out(f"   First block ............ {ts(min(bt))} ({min(bt) - t0:.0f} s after the first attack flow)")
     else:
         out("   No DDoS flows were detected.")
 

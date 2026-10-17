@@ -17,7 +17,7 @@ it is blocked (BLOCK line), so a single false alarm does not cut a legitimate ho
 log (with the time each address was blocked) for the incident report.
 
 usage (offline, on a recorded pcap, no blocking):
-    python3 10_detect_block.py --model models/global_lucid.pt --pcap data/validation_replay.pcap \
+    python3 10_detect_block.py --model models/global_lucid.pt --pcap replay/attacker1.pcap \
             --victim 172.30.0.10 --out results/incident_offline.csv
 usage (live on the server interface, with blocking):
     python3 10_detect_block.py --model models/global_lucid.pt --iface eth0 --victim 172.30.0.10 \
@@ -28,6 +28,7 @@ import csv
 import os
 import queue
 import subprocess
+import tempfile
 import threading
 import time
 
@@ -37,10 +38,14 @@ import lablib
 
 
 def block_ip(ip):
-    """Drop further input from this address (idempotent)."""
+    """Drop further input from this address (idempotent). Returns True when the rule is in place."""
     chk = subprocess.run(["iptables", "-C", "INPUT", "-s", ip, "-j", "DROP"], capture_output=True)
     if chk.returncode != 0:
-        subprocess.run(["iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"], capture_output=True)
+        add = subprocess.run(["iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"], capture_output=True, text=True)
+        if add.returncode != 0:
+            print(f"WARNING: could not block {ip}: {add.stderr.strip()}", flush=True)
+            return False
+    return True
 
 
 def classify_window(model, pipe, packets, victim_int, threshold):
@@ -53,6 +58,8 @@ def classify_window(model, pipe, packets, victim_int, threshold):
     n_pk = (np.abs(X).sum(axis=2) > 0).sum(axis=1)               # packets in the sample (max n)
     out = []
     for key, pv, t, k in zip(keys, prob, first_ts, n_pk):
+        if victim_int not in (key[0], key[2]):
+            continue                                                 # not traffic of the protected host
         peer_first = key[0] != victim_int                            # key = (ip, port, ip, port, proto)
         peer, peer_pt, vic_pt = (key[0], key[1], key[3]) if peer_first else (key[2], key[3], key[1])
         out.append({"key": key, "time": float(t), "peer_ip": lablib.int_to_ip(peer), "peer_port": peer_pt,
@@ -76,7 +83,9 @@ def main():
     a.add_argument("--victim", required=True, help="the server's own IP (the protected host)")
     a.add_argument("--threshold", type=float, default=0.5)
     a.add_argument("--block", action="store_true", help="add an iptables DROP rule per attacker IP (live mode)")
-    a.add_argument("--seconds", type=float, default=0, help="live capture duration (0 = until interrupted)")
+    a.add_argument("--seconds", type=float, default=0,
+                   help="live capture duration from the detector's start (0 = until Ctrl-C); start "
+                        "13_launch_replay.sh within about 30 s, the replay itself lasts about 100 s")
     a.add_argument("--interval", type=float, default=5,
                    help="live: re-classify the open window every N seconds (0 = only when it closes)")
     a.add_argument("--min-alerts", type=int, default=3,
@@ -85,6 +94,10 @@ def main():
                    help="live: a flow is judged before its window closes only after N s without packets")
     a.add_argument("--out", required=True)
     args = a.parse_args()
+    if args.pcap and args.block:
+        a.error("--block only applies to live capture (--iface); a pcap is analysed offline")
+    if args.iface and os.geteuid() != 0:
+        a.error("live capture and blocking need root: run it with sudo")
     lablib.set_seed()
     import torch
 
@@ -110,7 +123,7 @@ def main():
           + (f", block after {args.min_alerts} alerts" if args.block else ""))
 
     def alert(w, r, when):
-        """Print one flagged flow once; block its source on the first alert."""
+        """Print one flagged flow once; block its source once it has --min-alerts flagged flows."""
         if (w, r["key"]) in alerted or r["peer_ip"] == args.victim:
             return
         alerted[(w, r["key"])] = when
@@ -119,8 +132,9 @@ def main():
         n_alerts[r["peer_ip"]] = n_alerts.get(r["peer_ip"], 0) + 1
         if r["peer_ip"] not in blocked and n_alerts[r["peer_ip"]] >= args.min_alerts:
             blocked[r["peer_ip"]] = when
-            if args.block:
-                block_ip(r["peer_ip"])
+            if args.block and not block_ip(r["peer_ip"]):
+                del blocked[r["peer_ip"]]
+                return
             print(f"{clock(when)}  {'BLOCK' if args.block else 'FLAG '}  {r['peer_ip']}"
                   + ("  (iptables -A INPUT -s %s -j DROP)" % r["peer_ip"] if args.block else ""), flush=True)
 
@@ -147,7 +161,8 @@ def main():
             bt = blocked.get(r["peer_ip"])
             writer.writerow([w, f"{r['time']:.3f}", r["peer_ip"], r["peer_port"], r["victim_port"], r["proto"],
                              r["packets"], f"{r['prob']:.6f}", r["pred"], f"{at:.3f}" if at else "",
-                             "yes" if bt is not None and args.block else "", f"{bt:.3f}" if bt else ""])
+                             "yes" if bt is not None and args.block else "",
+                             f"{bt:.3f}" if bt is not None and args.block else ""])
         fh.flush()
         print(f"[window {w} closed] {len(res)} flows, {attack} classified DDoS", flush=True)
 
@@ -159,8 +174,9 @@ def main():
             for w in range(int(win.max()) + 1):
                 handle_window(w, [packets[i] for i in np.flatnonzero(win == w)])
     else:
+        errors = tempfile.TemporaryFile(mode="w+")
         proc = subprocess.Popen(lablib.tshark_command(iface=args.iface), stdout=subprocess.PIPE,
-                                stderr=subprocess.DEVNULL, text=True, bufsize=1)
+                                stderr=errors, text=True, bufsize=1)
         lines = queue.Queue()
         threading.Thread(target=lambda: ([lines.put(x) for x in proc.stdout], lines.put(None)), daemon=True).start()
         buf, start, w, t_end = [], None, 0, time.time() + args.seconds if args.seconds else None
@@ -188,6 +204,9 @@ def main():
                 next_check = now + args.interval
         if buf:
             handle_window(w, buf, time.time())
+        if proc.poll() not in (None, 0):                             # tshark stopped by itself
+            errors.seek(0)
+            raise SystemExit("tshark failed: " + errors.read().strip()[-500:])
         proc.terminate()
 
     fh.close()

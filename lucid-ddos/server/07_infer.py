@@ -33,6 +33,12 @@ def main():
     ck = torch.load(args.model, map_location="cpu")
     pipe = ck["pipeline"]
     d = lablib.load_npz(os.path.join(args.data, f"{args.split}.npz"))
+    data_pipe = lablib.load_pipeline(args.data)
+    differ = [k for k in ("window_s", "flows_id", "norm_mode", "features", "n_packets")
+              if k in pipe and k in data_pipe and pipe[k] != data_pipe[k]]
+    if differ:
+        raise SystemExit(f"the model was trained on data prepared differently ({', '.join(differ)}): "
+                         + "; ".join(f"{k}: model {pipe[k]} / data {data_pipe[k]}" for k in differ))
     X = torch.from_numpy(d["X"])
     if X.shape[2] != pipe["n_features"] or X.shape[1] != pipe["n_packets"]:
         raise SystemExit(f"data shape {tuple(X.shape[1:])} does not match the model "

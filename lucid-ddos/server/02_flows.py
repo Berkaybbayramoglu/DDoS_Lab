@@ -64,6 +64,14 @@ def main():
     # balance (sample level, seed 42): all samples of the smaller class, the same number of the other
     rng = np.random.default_rng(lablib.SEED)
     ddos, benign = np.flatnonzero(s_label == 1), np.flatnonzero(s_label == 0)
+    if len(ddos) == 0 or len(benign) == 0:
+        ips, counts = np.unique(np.concatenate([s_key[:, 0], s_key[:, 2]]), return_counts=True)
+        busiest = ", ".join(f"{lablib.int_to_ip(int(i))} ({c})" for i, c in
+                            sorted(zip(ips, counts), key=lambda x: -x[1])[:6])
+        raise SystemExit(f"no {'DDoS' if len(ddos) == 0 else 'benign'} samples: no flow is "
+                         f"{'between' if len(ddos) == 0 else 'outside'} --attackers {' '.join(args.attackers)} and "
+                         f"--victims {' '.join(args.victims)}. Check the addresses; the busiest hosts in the "
+                         f"capture (flows) are: {busiest}")
     if args.no_balance:
         selected = np.ones(n, dtype=bool)
     else:
@@ -98,6 +106,7 @@ def main():
     np.savez_compressed(os.path.join(args.out, "flows.npz"), window=s_window, key=s_key, label=s_label,
                         packets=s_npk, first_packet=s_first, selected=selected, split=s_split,
                         sample_of_packet=sample_of_packet, rel_time=rel_time)
+    pipe["flows_id"] = lablib.flows_id({"key": s_key, "split": s_split, "label": s_label, "selected": selected})
     pipe.update({"step": "02_flows", "window_dir": args.inp, "attackers": args.attackers,
                  "victims": args.victims, "split": {"test": args.test, "val": args.val},
                  "balanced": not args.no_balance, "seed": lablib.SEED})

@@ -29,7 +29,7 @@ def build_packet_matrix(win_dir, flow_dir):
     keep = np.flatnonzero(f["selected"][f["sample_of_packet"]])     # packets of selected samples, time order
     X = np.column_stack([f["rel_time"][keep], p["feats"][keep],
                          p["src_ip"][keep], p["dst_ip"][keep], p["src_port"][keep], p["dst_port"][keep]])
-    return X.astype(np.float64), f["sample_of_packet"][keep], f
+    return X.astype(np.float64), f["sample_of_packet"][keep], f, p
 
 
 def main():
@@ -42,7 +42,9 @@ def main():
     lablib.set_seed()
 
     pipe = lablib.load_pipeline(args.inp)
-    X, sample, f = build_packet_matrix(pipe["window_dir"], args.inp)
+    X, sample, f, p = build_packet_matrix(pipe["window_dir"], args.inp)
+    lablib.require_same(pipe, "packets_id", lablib.packets_id(p), pipe["window_dir"], "02_flows.py and the later steps")
+    lablib.require_same(pipe, "flows_id", lablib.flows_id(f), args.inp, "the steps after 02_flows.py")
     split = f["split"][sample]
     names = lablib.ALL_FEATURES
 

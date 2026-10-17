@@ -48,7 +48,8 @@ def main():
         rows.append([w, f"{first - ts[0]:.1f}", f"{first - ts[0] + args.window:.1f}", int(m.sum()),
                      f"{gap:.1f}" if w else "-"])
     lablib.save_pipeline(args.out, {"step": "01_window", "pcap": os.path.abspath(args.pcap),
-                                    "window_s": args.window, "packets": len(ts), "windows": windows})
+                                    "window_s": args.window, "packets": len(ts), "windows": windows,
+                                    "packets_id": lablib.packets_id({"frame": pk["frame"], "ts": ts, "window": win})})
 
     print(f"read {len(ts)} IPv4 packets in {time.perf_counter() - t0:.1f} s, capture spans {ts[-1] - ts[0]:.1f} s")
     lablib.print_table(rows, ["window", "start (s)", "end (s)", "packets", "silence before (s)"])

@@ -56,6 +56,5 @@ PY
 rm -f "$SRV/results/registry_check.json"
 
 echo "== Summary: $PASS passed, $FAIL failed"
-[ $FAIL -eq 0 ]
-
 rm -rf "$SRV/work/.check"
+[ $FAIL -eq 0 ]                      # exit status of the script: 0 only if every check passed

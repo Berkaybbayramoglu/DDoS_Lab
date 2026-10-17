@@ -15,8 +15,14 @@ file from its own container, so the server sees two attacking IPs and one benign
 
 The validation flows come from the whole recording (about 20 minutes of sessions). Their start
 times are scaled into --duration seconds (default 90, so the incident fits one detection window),
-in the recorded order; the packets inside each flow keep their original spacing, so every flow
-looks to the model exactly as it was recorded - only more flows run at the same time.
+in the recorded order; the packets inside each flow keep their original spacing. Two things would
+otherwise make replayed flows differ from recorded ones, so the replay keeps one sample per flow
+as the server will see it:
+  * the same 5-tuple recorded in several windows (e.g. a SYN flood reusing source ports in two
+    sessions) would merge into one flow inside the 90 s;
+  * the benign clients all replay from the one client container, so two clients that used the same
+    source port would become one flow.
+Samples that do not involve the victim (e.g. multicast announcements) are left out.
 
 usage:  python3 12_build_replay.py --flows work/02_flows --victim 172.30.0.10 --out replay
 """
@@ -83,6 +89,7 @@ def main():
     pipe = lablib.load_pipeline(args.flows)
     f = lablib.load_npz(os.path.join(args.flows, "flows.npz"))
     p = lablib.load_npz(os.path.join(pipe["window_dir"], "packets.npz"))
+    lablib.require_same(pipe, "packets_id", lablib.packets_id(p), pipe["window_dir"], "02_flows.py")
     pcap = pipe["pcap"]
     if not os.path.exists(pcap):                                 # stored path may be from another mount
         pcap = os.path.join("data", os.path.basename(pcap))
@@ -90,13 +97,29 @@ def main():
         raise SystemExit(f"capture not found ({pipe['pcap']} or {pcap})")
     os.makedirs(args.out, exist_ok=True)
 
-    val = f["split"] == "val"
+    victim = lablib.ip_to_int(args.victim)
+    key = f["key"]
+    involves_victim = (key[:, 0] == victim) | (key[:, 2] == victim)
+    val = (f["split"] == "val") & involves_victim
     attack_samples = np.flatnonzero(val & (f["label"] == 1))
     benign_samples = np.flatnonzero(val & (f["label"] == 0))
     rng = np.random.default_rng(lablib.SEED)
     rng.shuffle(attack_samples)
     half = len(attack_samples) // 2
     parts = {"attacker1": attack_samples[:half], "attacker2": attack_samples[half:], "benign": benign_samples}
+
+    # one sample per flow as the server will see it: the peer address is replaced by the replaying
+    # container's single address, so a flow is identified by (victim port, peer port, protocol)
+    first_ts = p["ts"][f["first_packet"]]
+    dropped = {}
+    for name, samples in parts.items():
+        samples = samples[np.argsort(first_ts[samples], kind="stable")]
+        k = key[samples]
+        vic_first = k[:, 0] == victim
+        seen = np.stack([np.where(vic_first, k[:, 1], k[:, 3]), np.where(vic_first, k[:, 3], k[:, 1]), k[:, 4]], axis=1)
+        _, first = np.unique(seen, axis=0, return_index=True)
+        dropped[name] = len(samples) - len(first)
+        parts[name] = samples[np.sort(first)]
 
     # map every packet's original frame number to the output file of its sample
     names = list(parts)
@@ -135,6 +158,8 @@ def main():
         for name in parts:                                       # read by 13_launch_replay.sh
             fh.write(f"peers_{name}={','.join(peers[name])}\n")
     print(f"validation split replay built from {os.path.basename(pcap)} (victim {args.victim})")
+    print("one sample per flow as the server sees it; left out as duplicates: "
+          + ", ".join(f"{name} {n}" for name, n in dropped.items()))
     lablib.print_table(rows, ["file", "flows", "packets", "peer IP(s)"])
     print(f"-> {args.out}/  (attacker1.pcap, attacker2.pcap, benign.pcap, manifest.txt)")
 
