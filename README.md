@@ -19,7 +19,12 @@ and blocks the attackers, and the student writes a post-incident report.
 
 ## Using the lab
 
-Students, in a Labtainer VM: `labtainer lucid-ddos` (the images come from Docker Hub).
+Students, in the `labtainer-student` terminal of a Labtainer VM:
+
+```bash
+imodule https://github.com/Berkaybbayramoglu/DDoS_Lab/releases/download/imodule/imodule.tar   # once
+labtainer lucid-ddos           # the container images come from Docker Hub
+```
 
 Lab developers, to work on the lab in a Labtainer VM:
 

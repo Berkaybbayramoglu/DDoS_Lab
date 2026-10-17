@@ -4,8 +4,10 @@ Every script is responsible for one learning outcome. It writes its output to a 
 `pipeline.json`) that the next script reads, so the whole pipeline can be reproduced from its
 parameters. Training and evaluation run single-threaded with seed 42 and deterministic PyTorch.
 
-This folder is a standard Labtainer lab. Students start it with `labtainer lucid-ddos`; the images
-are pulled from Docker Hub (`REGISTRY berkaybbayramoglu` in `config/start.config`, published by CI).
+This folder is a standard Labtainer lab. Students add it once with
+`imodule https://github.com/Berkaybbayramoglu/DDoS_Lab/releases/download/imodule/imodule.tar`
+(built by `../tools/build_imodule.sh`, published by CI) and start it with `labtainer lucid-ddos`;
+the images are pulled from Docker Hub (`REGISTRY berkaybbayramoglu` in `config/start.config`, published by CI).
 To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` and build it there with
 `rebuild lucid-ddos` (or labedit: Run → Build and run).
 

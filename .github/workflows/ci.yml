@@ -5,7 +5,8 @@ name: CI
 # postlab         live detection + blocking against the replayed validation traffic, report checks
 # labtainer-images
 #                 builds the four Labtainer images as Labtainer does and checks their contents;
-#                 on main (after all other jobs passed) publishes them to Docker Hub
+#                 on main (after all other jobs passed) publishes them to Docker Hub and the
+#                 imodule (what students add with `imodule <url>`) to the GitHub release "imodule"
 
 on:
   push:
@@ -63,10 +64,14 @@ jobs:
     needs: [static, pipeline, postlab]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    permissions:
+      contents: write
     env:
       DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                    # file times of the imodule come from the git history
       - name: Free disk space for the Labtainer base images
         run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
       - name: Build the Labtainer images (as Labtainer's buildImage.sh)
@@ -82,3 +87,13 @@ jobs:
       - name: Publish to Docker Hub
         if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
         run: tools/publish_images.sh "$DOCKERHUB_USERNAME" "${GITHUB_SHA::7}"
+      - name: Publish the imodule (students run `imodule <release url>`)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.DOCKERHUB_USERNAME != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tools/build_imodule.sh imodule.tar
+          gh release view imodule >/dev/null 2>&1 || \
+            gh release create imodule --title "Labtainer imodule" \
+              --notes "Add the lab to Labtainer with: imodule https://github.com/${{ github.repository }}/releases/download/imodule/imodule.tar"
+          gh release upload imodule imodule.tar --clobber
