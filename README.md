@@ -54,5 +54,11 @@ it publishes the images to Docker Hub:
 | `berkaybbayramoglu/lucid-ddos.<container>.student:latest` | Labtainer (`REGISTRY berkaybbayramoglu` in `config/start.config`) |
 | `berkaybbayramoglu/ddos_lab:<container>` | the same images in one repository |
 
+Like Labtainer's own `distrib/relabel.sh`, every published image carries the label
+`base=labtainers/labtainer.network3.<id>` (a student's Labtainer refuses an image without it) and is
+also tagged `:base_image<id>`. The id is the base image's config digest, read from Docker Hub by
+`tools/base_image_id.py`, so it matches `docker images -q` on the Labtainer VM whatever Docker
+version builds the images.
+
 Publishing needs the repository variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`.
 The tools use `docker --context default`.

@@ -32,5 +32,10 @@ for c in server attacker1 attacker2 client; do
   check "$c: lab user with passwordless sudo, no SSH key shipped" lucid-ddos.$c.student ubuntu \
     'id ubuntu >/dev/null && sudo -n true && ! ls -A ~/.ssh 2>/dev/null | grep -q .'
 done
+for c in server attacker1 attacker2 client; do
+  label=$($D inspect --format '{{index .Config.Labels "base"}}' lucid-ddos.$c.student 2>/dev/null)
+  if [[ "$label" =~ ^[a-z0-9]+/labtainer\.[a-z0-9.]+\.[0-9a-f]{12}$ ]]; then echo "PASS  $c: Labtainer base label ($label)"
+  else echo "FAIL  $c: Labtainer base label missing or malformed ('$label')"; FAIL=1; fi
+done
 [ $FAIL -eq 0 ] && echo "all checks passed" || echo "some checks failed"
 exit $FAIL

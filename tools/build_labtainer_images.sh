@@ -7,7 +7,9 @@
 #   home_tar/home.tar, sys_tar/sys.tar    the large-file folders, packed as CheckTars.py does
 #                                         (home.tar gzip'ed with owner 1000 and its file list in
 #                                         config/<container>-home_tar.list; sys.tar owned by root)
-# then the two-stage docker build of buildImage.sh (second stage: chown root:root /var).
+# then the two-stage docker build of buildImage.sh (second stage: chown root:root /var), plus the
+# label Labtainer's distrib/relabel.sh adds before publishing: base=<base image>.<its image id>
+# (a student's Labtainer refuses a published image without it).
 # Archives carry uid/gid 1000, as when Labtainer builds on its VM. Outputs of the lab scripts
 # (work/, models/, results/, replay/, __pycache__) are left out.
 #   usage: build_labtainer_images.sh [base registry]       (default: labtainers)
@@ -67,7 +69,9 @@ for c in $containers; do
       --build-arg user_name="$user" --build-arg password="$password" --build-arg apt_source=archive.ubuntu.com \
       --build-arg registry="$BASE_REGISTRY" --build-arg version="$VERSION" \
       -f "$ctx/Dockerfile.$img" -t "$img.tmp" "$ctx" >/dev/null
-  printf 'FROM %s.tmp\nRUN chown root:root /var\n' "$img" | $D build -q -t "$img" - >/dev/null
+  base=$(awk '$1 == "FROM" {print $2; exit}' "$ctx/Dockerfile.$img"); base=${base/\$registry/$BASE_REGISTRY}
+  base_id=$(python3 "$(dirname "$0")/base_image_id.py" "$base")   # config digest, as on Labtainer's VM
+  printf 'FROM %s.tmp\nRUN chown root:root /var\nLABEL base=%s.%s\n' "$img" "$base" "$base_id" | $D build -q -t "$img" - >/dev/null
   $D rmi "$img.tmp" >/dev/null
-  echo "   -> $img"
+  echo "   -> $img (base $base.$base_id)"
 done
