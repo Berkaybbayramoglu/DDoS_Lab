@@ -8,6 +8,12 @@ Run it after each step to see whether the step did what the lab sheet describes:
   python3 check.py --stage shape     --dir work/05_shape_global_lucid
 Every rule is recomputed from the previous step's files and compared. The table shows how many
 items satisfy each rule; the score is the share of rules that pass completely.
+
+After the experiments, compare your runs with the reference results of the lab:
+  python3 check.py --stage results   --dir results
+The lab is deterministic (seed 42), so every run of the lab sheet has one expected result. For
+every reference run in results/registry.json the settings (normalization, features, n, or the
+classical rule) and the metrics (within 0.5 percentage points) are compared with the reference.
 """
 import argparse
 import os
@@ -132,11 +138,92 @@ def check_shape(d):
     return rules
 
 
+# Reference results of the lab sheet (Labtainer, seed 42, test split of 4,260 samples), in percent:
+# (group, name): (accuracy, F1, false-positive rate, recall, expected settings)
+LUCID = "lucid"
+REFERENCE = {
+    ("normalization", "global"):      (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 100}),
+    ("normalization", "none"):        (99.91, 99.91, 0.19, 100.00, {"norm_mode": "none", "features": LUCID, "n_packets": 100}),
+    ("normalization", "theoretical"): (100.00, 100.00, 0.00, 100.00, {"norm_mode": "theoretical", "features": LUCID, "n_packets": 100}),
+    ("normalization", "batchnorm"):   (100.00, 100.00, 0.00, 100.00, {"norm_mode": "batchnorm", "features": LUCID, "n_packets": 100}),
+    ("features", "lucid (test)"):             (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100}),
+    ("features", "lucid (test_newaddr)"):     (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100}),
+    ("features", "lucid_ids (test)"):         (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid_ids", "n_packets": 100}),
+    ("features", "lucid_ids (test_newaddr)"): (52.93, 39.77, 25.35, 31.14, {"norm_mode": "global", "features": "lucid_ids", "n_packets": 100}),
+    ("features", "ids_only (test)"):          (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "ids_only", "n_packets": 100}),
+    ("features", "ids_only (test_newaddr)"):  (1.41, 0.00, 97.19, 0.00, {"norm_mode": "global", "features": "ids_only", "n_packets": 100}),
+    ("shape", "n=3"):   (75.21, 66.96, 0.00, 50.33, {"norm_mode": "global", "features": LUCID, "n_packets": 3}),
+    ("shape", "n=10"):  (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 10}),
+    ("shape", "n=50"):  (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 50}),
+    ("shape", "n=100"): (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 100}),
+    ("classical", "LUCID CNN"):               (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 100}),
+    ("classical", "syn threshold"):           (100.00, 100.00, 0.00, 100.00, {"rule": "syn", "bots": 1}),
+    ("classical", "syn threshold (50 bots)"): (50.09, 0.00, 0.00, 0.00, {"rule": "syn", "bots": 50}),
+}
+HINT = {"norm_mode": "the --mode of 03_normalize.py", "features": "the --set of 04_features.py",
+        "n_packets": "the -n of 05_shape.py", "rule": "the --rule of 14_classical.py",
+        "bots": "the --bots of 14_classical.py", "result": "the --split of 07_infer.py or the input files"}
+TOLERANCE = 0.5                                                   # percentage points
+
+
+def run_settings(r):
+    """Settings a registry entry was produced with: from its model file or its classical sweep."""
+    if r.get("sweep"):
+        return {"rule": r["sweep"]["rule"], "bots": r["sweep"]["bots"]}
+    log = r.get("train_log")
+    model = log[:-len("_train_log.json")] + ".pt" if log else None
+    if not model or not os.path.exists(model):
+        return {}
+    import torch
+    pipe = torch.load(model, map_location="cpu")["pipeline"]
+    sets = {"lucid": lablib.LUCID_FEATURES, "lucid_ids": lablib.LUCID_FEATURES + lablib.ID_FEATURES,
+            "ids_only": lablib.ID_FEATURES}
+    feats = next((k for k, v in sets.items() if list(v) == list(pipe.get("features", []))), "custom")
+    return {"norm_mode": pipe.get("norm_mode"), "features": feats, "n_packets": pipe.get("n_packets")}
+
+
+def check_results(d):
+    import json
+    path = os.path.join(d, "registry.json")
+    if not os.path.exists(path):
+        raise SystemExit(f"{path} not found: evaluate your runs with 08_evaluate.py first")
+    reg = {(r["group"], r["name"]): r for r in json.load(open(path))}
+    rows, ok_count = [], 0
+    for (group, name), (*ref, want) in REFERENCE.items():
+        r = reg.get((group, name))
+        if r is None:
+            rows.append([group, name, "-", f"{ref[0]:.1f}", "not run yet (run it with this --name and --group)"])
+            continue
+        got = [100 * r["point"][m] for m in ("accuracy", "f1", "fpr", "recall")]
+        have = run_settings(r)
+        wrong = [k for k, v in want.items() if k in have and have[k] != v]
+        off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref)) or r["samples"] != 4260
+        if wrong:
+            note = "; ".join(f"{k} is {have[k]}, expected {want[k]}: check {HINT[k]}" for k in wrong)
+        elif off:
+            note = f"different result (F1 {got[1]:.1f}, expected {ref[1]:.1f}): check {HINT['result']}"
+        else:
+            note = "matches the reference" + ("" if have else " (settings not linked: use --model in 08_evaluate.py)")
+            ok_count += 1
+        rows.append([group, name, f"{got[0]:.1f}", f"{ref[0]:.1f}", note])
+    extra = sorted(k for k in reg if k not in REFERENCE)
+    return rows, ok_count, extra
+
+
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    a.add_argument("--stage", choices=["window", "flows", "normalize", "features", "shape"], required=True)
+    a.add_argument("--stage", choices=["window", "flows", "normalize", "features", "shape", "results"], required=True)
     a.add_argument("--dir", required=True)
     args = a.parse_args()
+    if args.stage == "results":
+        rows, ok_count, extra = check_results(args.dir)
+        lablib.print_table(rows, ["group", "run", "your accuracy %", "expected %", "check"])
+        if extra:
+            print("runs that are not part of the lab sheet (not checked): " + ", ".join(f"{g}/{n}" for g, n in extra))
+        score = 100 * ok_count / len(REFERENCE)
+        print(f"{ok_count} of {len(REFERENCE)} reference runs match")
+        print(f"results stage - {score:.0f} % of the reference runs match")   # graded by Labtainer
+        return
     rules = {"window": check_window, "flows": check_flows, "normalize": check_normalize,
              "features": check_features, "shape": check_shape}[args.stage](args.dir)
     scored = [r for r in rules if r[1] != "info"]

@@ -41,7 +41,7 @@ a model prepared differently from the data (window, flows, normalization, featur
 | 9 | `09_plot.py` | Comparison figure per experiment + confidence interval table (view with `feh -. results/plots/figure1_normalization.png`; `-.` fits the figure to the window) | `results/plots/` |
 | 14 | `14_classical.py` | Classical detection: a per-source threshold (SYN or packets per second in a window), tuned on the training split; `--bots K` spreads the attack over K bot addresses | `results/classical_*.csv` (+ `.sweep.json`) |
 | 15 | `15_explain.py` | What the model relies on (permutation importance) and where it fails (errors by flow length) | `results/explain_*.csv`, `results/plots/explain_*.png` |
-| – | `check.py` | Checks the rules of every preprocessing step independently | table on screen |
+| – | `check.py` | Checks the rules of every preprocessing step independently; `--stage results` compares every run of the lab sheet with the reference results (settings and metrics) | table on screen |
 
 ```bash
 python3 01_window.py --pcap data/lab_traffic.pcap.gz -t 100 --out work/01_window
@@ -88,6 +88,9 @@ python3 08_evaluate.py  --pred results/classical_syn_bots50.csv --name "syn thre
 
 # Comparison figures + confidence interval tables
 python3 09_plot.py --groups normalization features shape classical
+
+# Every run compared with the reference results of the lab (settings + metrics within 0.5 points)
+python3 check.py --stage results --dir results
 
 # What the models rely on and where they fail
 python3 15_explain.py --model models/global_lucid.pt     --data work/05_shape_global_lucid
@@ -200,6 +203,7 @@ every type). To regenerate: `../tools/build_lab_dataset.sh` (about 20 minutes).
 | Goal | Source |
 | --- | --- |
 | `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass`" |
+| `results_check` | `check.py --stage results`: all 17 runs of the lab sheet match the reference |
 | `normalization_compared`, `features_compared`, `shape_compared` | `09_plot.py` stdout (one figure per experiment) |
 | `address_swap_tested` | `07_infer.py` was run on the `test_newaddr` split |
 | `classical_tested`, `classical_compared` | `14_classical.py` was run with `--bots`; `09_plot.py` drew the classical figure |
@@ -224,7 +228,7 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
 
 - `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset.
 - `check_lab.sh`: runs the whole pipeline on 1 CPU and checks the stage scores, determinism and the
-  normalization ordering, classical rule and explanation (10/10, about 9 minutes).
+  normalization ordering, classical rule, explanation and the reference results (11/11, about 9 minutes).
 - `train_default_model.sh` + `postlab_live.sh`: the post-lab with plain Docker containers; checks that
   both attackers and only they are blocked, recall >= 90 %, FPR <= 5 %. The SSH hand-over of step 0 is
   exercised in Labtainer, not here.

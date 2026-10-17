@@ -58,22 +58,23 @@ PY
 rm -f "$SRV/results/plots/explain_m.png"
 
 echo "== normalization experiment: final training loss raw > theoretical > global"
-rm -f "$SRV/results/registry_check.json"
+rm -rf "$SRV/$W/reg"
 for m in none theoretical global batchnorm; do
   $R sh -c "python3 03_normalize.py --in $W/02 --mode $m --out $W/n_$m >/dev/null &&
             python3 04_features.py --in $W/n_$m --set lucid --out $W/f_$m >/dev/null &&
             python3 05_shape.py --in $W/f_$m -n 100 --out $W/s_$m >/dev/null &&
             python3 06_train.py --data $W/s_$m --model $W/m_$m.pt >/dev/null &&
             python3 07_infer.py --model $W/m_$m.pt --data $W/s_$m --split test --out $W/e_$m.csv >/dev/null &&
-            python3 08_evaluate.py --pred $W/e_$m.csv --name $m --group norm --model $W/m_$m.pt --registry results/registry_check.json" >/dev/null 2>&1
+            python3 08_evaluate.py --pred $W/e_$m.csv --name $m --group normalization --model $W/m_$m.pt --registry $W/reg/registry.json" >/dev/null 2>&1
 done
 $R python3 - <<'PY' 2>/dev/null && ok "training loss raw > theoretical > global, global accuracy >= 99 %" || bad "normalization ordering"
 import json, sys
 loss = {m: float(json.load(open(f"/srv/work/.check/m_{m}_train_log.json"))["epochs"][-1][1]) for m in ("none", "theoretical", "global")}
-acc = {x["name"]: x["point"]["accuracy"] for x in json.load(open("/srv/results/registry_check.json"))}
+acc = {x["name"]: x["point"]["accuracy"] for x in json.load(open("/srv/work/.check/reg/registry.json"))}
 sys.exit(0 if loss["none"] > loss["theoretical"] > loss["global"] and acc["global"] >= 0.99 else 1)
 PY
-rm -f "$SRV/results/registry_check.json"
+if [ "$($R python3 check.py --stage results --dir $W/reg 2>/dev/null | grep -c '^| normalization .*matches the reference')" = 4 ]; then
+  ok "reference results: the 4 normalization runs match check.py --stage results"; else bad "reference results (check.py --stage results)"; fi
 
 echo "== Summary: $PASS passed, $FAIL failed"
 rm -rf "$SRV/work/.check"
