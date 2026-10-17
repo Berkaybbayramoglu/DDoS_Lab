@@ -26,6 +26,15 @@ imodule https://github.com/Berkaybbayramoglu/DDoS_Lab/releases/download/imodule/
 labtainer lucid-ddos           # the container images come from Docker Hub
 ```
 
+Labtainer does not refresh images it has already downloaded. After a new version was published,
+students get it with:
+
+```bash
+stoplab lucid-ddos
+for c in server attacker1 attacker2 client; do docker pull berkaybbayramoglu/lucid-ddos.$c.student; done
+labtainer -r lucid-ddos        # -r: start from fresh containers
+```
+
 Lab developers, to work on the lab in a Labtainer VM:
 
 ```bash
