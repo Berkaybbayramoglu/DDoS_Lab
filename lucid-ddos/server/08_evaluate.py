@@ -93,7 +93,8 @@ def main():
     if (args.group, args.name) in check.REFERENCE:
         acc, f1, fpr = check.REFERENCE[(args.group, args.name)][:3]
         ok, note = check.compare_run(entry)
-        print(f"expected result of this run: accuracy {acc:.1f} %, F1 {f1:.1f} %, false-positive rate {fpr:.1f} %")
+        print(f"expected result of this run: accuracy {acc:.1f} %, F1 {f1:.1f} %, false-positive rate {fpr:.1f} %"
+              + (" (on the reference computer; this run varies between computers)" if (args.group, args.name) in check.VARIES else ""))
         print(f"your run: {'OK - ' if ok else 'CHECK - '}{note}")
     else:
         print(f"no expected result for '{args.name}' in group '{args.group}' (not a run of the lab sheet)")

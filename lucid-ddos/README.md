@@ -229,7 +229,10 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
   Figure 1b); theoretical (super-global) min-max learns smoothly but more slowly (final loss 0.005)
   than global (0.002) and batchnorm (0.0016), which reach 99.96–99.98 %. The question for students is not
   "which is more accurate" but "which learns better and more stably, and why".
-- The same results come out on the host (plain Docker) and in the VM, run for run.
+- The same results come out on the host (plain Docker) and in the VM, run for run. One run depends
+  on the computer: training on raw values (`none`) is numerically unstable, and tiny rounding
+  differences between CPUs give different models (97.7 % here, 76.8 % on a GitHub runner).
+  `check.py` therefore compares only the settings of that run (`VARIES`), and `08_evaluate.py` says so.
 - Time: one training (36,858 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
   lab part (23 evaluated runs) takes about 11 min of machine time on 1 CPU, the post-lab about 3 min.
@@ -268,6 +271,9 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
 ## Developer checks and CI (plain Docker, see `../tools/` and `../.github/workflows/ci.yml`)
 
 - `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset.
+- `lab_sheet.sh`: runs every command of the lab sheet on 1 CPU and requires all 23 runs to match
+  the reference results (`check.py --stage results`), so CI shows whether another computer gets the
+  same results (about 12 minutes).
 - `check_lab.sh`: runs the whole pipeline on 1 CPU and checks the stage scores, determinism and the
   normalization ordering, classical rule, explanation and the reference results (11/11, about 9 minutes).
 - `train_default_model.sh` + `postlab_live.sh`: the post-lab with plain Docker containers; checks that

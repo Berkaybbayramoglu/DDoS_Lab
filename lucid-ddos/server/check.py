@@ -192,6 +192,10 @@ HINT = {"norm_mode": "the --mode of 03_normalize.py", "features": "the --set of 
         "bots": "the --bots of 14_classical.py", "fit_on": "the --fit-on of 03_normalize.py",
         "train_on": "the --train-on of 06_train.py",
         "result": "the --split and --source of 07_infer.py or the input files"}
+# Runs whose metrics depend on the computer: training on raw values is numerically unstable, so tiny
+# rounding differences between CPUs lead to different models (76.8 % and 97.7 % accuracy were
+# measured on two machines). Only their settings and sample count are compared.
+VARIES = {("normalization", "none")}
 TOLERANCE = 0.5                                                   # percentage points
 
 
@@ -218,10 +222,14 @@ def compare_run(r):
     got = [100 * r["point"][m] for m in ("accuracy", "f1", "fpr", "recall")]
     have = run_settings(r)
     wrong = [k for k, v in want.items() if k in have and have[k] != v]
-    off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref)) or r["samples"] != SAMPLES.get(
-        (r["group"], r["name"]), SAMPLES["default"])
+    samples = SAMPLES.get((r["group"], r["name"]), SAMPLES["default"])
+    off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref))
     if wrong:
         return False, "; ".join(f"{k} is {have[k]}, expected {want[k]}: check {HINT[k]}" for k in wrong)
+    if r["samples"] != samples:
+        return False, f"{r['samples']} test samples, expected {samples}: check {HINT['result']}"
+    if off and (r["group"], r["name"]) in VARIES:
+        return True, "settings match (the result of raw values varies between computers)"
     if off:
         return False, f"different result (F1 {got[1]:.1f}, expected {ref[1]:.1f}): check {HINT['result']}"
     return True, "matches the reference" + ("" if have else " (settings not linked: use --model in 08_evaluate.py)")

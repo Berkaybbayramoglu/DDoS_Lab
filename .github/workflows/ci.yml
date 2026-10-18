@@ -2,6 +2,7 @@ name: CI
 
 # static          fast repository checks (syntax, secrets, English, Labtainer layout, labedit rules)
 # pipeline        the whole lab pipeline on 1 CPU: stage checks, determinism, normalization ordering
+# labsheet        every command of the lab sheet; all 23 runs must match the reference results
 # postlab         live detection + blocking against the replayed validation traffic, report checks
 # labtainer-images
 #                 builds the four Labtainer images as Labtainer does and checks their contents;
@@ -58,8 +59,26 @@ jobs:
             lucid-ddos/server/results/incident_report.txt
           if-no-files-found: ignore
 
+  labsheet:
+    needs: static
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build developer images
+        run: tools/build_images.sh
+      - name: Lab sheet (all runs against the reference results)
+        run: tools/lab_sheet.sh
+      - name: Keep the log of the lab sheet
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-sheet-log
+          path: lucid-ddos/server/results/lab_sheet.log
+          if-no-files-found: ignore
+
   labtainer-images:
-    needs: [static, pipeline, postlab]
+    needs: [static, pipeline, labsheet, postlab]
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
