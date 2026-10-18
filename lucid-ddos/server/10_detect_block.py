@@ -84,8 +84,8 @@ def main():
     a.add_argument("--threshold", type=float, default=0.5)
     a.add_argument("--block", action="store_true", help="add an iptables DROP rule per attacker IP (live mode)")
     a.add_argument("--seconds", type=float, default=0,
-                   help="live capture duration from the detector's start (0 = until Ctrl-C); start "
-                        "13_launch_replay.sh within about 30 s, the replay itself lasts about 100 s")
+                   help="live capture duration, counted from the first packet seen (0 = until Ctrl-C); "
+                        "the detector waits for traffic, so 13_launch_replay.sh can be started at any time")
     a.add_argument("--interval", type=float, default=5,
                    help="live: re-classify the open window every N seconds (0 = only when it closes)")
     a.add_argument("--min-alerts", type=int, default=3,
@@ -179,7 +179,7 @@ def main():
                                 stderr=errors, text=True, bufsize=1)
         lines = queue.Queue()
         threading.Thread(target=lambda: ([lines.put(x) for x in proc.stdout], lines.put(None)), daemon=True).start()
-        buf, start, w, t_end = [], None, 0, time.time() + args.seconds if args.seconds else None
+        buf, start, w, t_end = [], None, 0, None    # t_end: --seconds after the first packet
         next_check = None
         while True:
             if t_end and time.time() >= t_end:
@@ -193,9 +193,13 @@ def main():
             now = time.time()
             if line:
                 p = lablib.parse_tshark_line(line)
+                if p and victim_int not in (p[2], p[3]):
+                    p = None                         # only the protected host's traffic opens a window
                 if p:
                     if start is None:
                         start, next_check = now, now + args.interval
+                    if t_end is None and args.seconds:
+                        t_end = now + args.seconds
                     buf.append(p)
             if start is not None and now >= start + t_win:
                 handle_window(w, buf, now); w += 1; buf, start, next_check = [], None, None

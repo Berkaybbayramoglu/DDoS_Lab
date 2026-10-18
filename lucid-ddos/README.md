@@ -140,7 +140,8 @@ Detector settings (`10_detect_block.py`):
 - Only flows of the protected host are judged; the lab's SSH channel (port 22, used by
   `13_launch_replay.sh`) is not captured. Live capture and blocking need `sudo`; `--block` is
   refused with `--pcap` (offline analysis never changes the firewall).
-- `--seconds` counts from the detector's start: start `13_launch_replay.sh` within about 30 s.
+- `--seconds` counts from the first packet the detector sees: it waits for the attack, so
+  `13_launch_replay.sh` can be started at any time (CI starts it 60 s after the detector).
 - Re-running the incident: `13_launch_replay.sh` first removes the DROP rules a previous detector
   run left for attacker1, attacker2 and client.
 
