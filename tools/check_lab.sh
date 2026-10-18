@@ -74,7 +74,7 @@ acc = {x["name"]: x["point"]["accuracy"] for x in json.load(open("/srv/work/.che
 sys.exit(0 if loss["none"] > loss["theoretical"] > loss["global"] and acc["global"] >= 0.99 else 1)
 PY
 RES=$($R python3 check.py --stage results --dir $W/reg 2>/dev/null)
-if [ "$(echo "$RES" | grep -c '^| normalization .*matches the reference')" = 4 ]; then
+if [ "$(echo "$RES" | grep -cE '^\| normalization .*(matches the reference|settings match)')" = 4 ]; then
   ok "reference results: the 4 normalization runs match check.py --stage results"
 else
   bad "reference results (check.py --stage results)"; echo "$RES" | grep '^| normalization'
