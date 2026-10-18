@@ -145,6 +145,18 @@ def main():
         fh.write("\n".join(lines) + "\n")
     print(f"\n-> report written to {args.out}")
 
+    if args.attackers:                             # expected outcome of the lab incident (screen only)
+        rec = 100 * tp / max(tp + fn, 1); fp_rate = 100 * fp / max(fp + tn, 1)
+        checks = [("both attackers blocked", set(args.attackers) <= set(bl)),
+                  ("no other address blocked (the legitimate client keeps its access)", set(bl) <= set(args.attackers)),
+                  (f"recall {rec:.1f} %, expected 100 %", rec >= 99),
+                  (f"false-positive rate {fp_rate:.1f} %, expected 0 %", fp_rate <= 1)]
+        print("\nExpected outcome of this incident:")
+        for name, ok in checks:
+            print(f"   {'PASS' if ok else 'FAIL'}  {name}")
+        n_ok = sum(ok for _, ok in checks)
+        print(f"   -> {n_ok} of {len(checks)} expected results reached ({100 * n_ok / len(checks):.0f} %)")
+
 
 if __name__ == "__main__":
     main()

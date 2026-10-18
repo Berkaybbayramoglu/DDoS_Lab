@@ -182,30 +182,39 @@ def run_settings(r):
     return {"norm_mode": pipe.get("norm_mode"), "features": feats, "n_packets": pipe.get("n_packets")}
 
 
-def check_results(d):
+def compare_run(r):
+    """(matches, note) for one registry entry that has a reference (REFERENCE[(group, name)])."""
+    *ref, want = REFERENCE[(r["group"], r["name"])]
+    got = [100 * r["point"][m] for m in ("accuracy", "f1", "fpr", "recall")]
+    have = run_settings(r)
+    wrong = [k for k, v in want.items() if k in have and have[k] != v]
+    off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref)) or r["samples"] != 4260
+    if wrong:
+        return False, "; ".join(f"{k} is {have[k]}, expected {want[k]}: check {HINT[k]}" for k in wrong)
+    if off:
+        return False, f"different result (F1 {got[1]:.1f}, expected {ref[1]:.1f}): check {HINT['result']}"
+    return True, "matches the reference" + ("" if have else " (settings not linked: use --model in 08_evaluate.py)")
+
+
+def load_registry(d):
     import json
     path = os.path.join(d, "registry.json")
     if not os.path.exists(path):
         raise SystemExit(f"{path} not found: evaluate your runs with 08_evaluate.py first")
-    reg = {(r["group"], r["name"]): r for r in json.load(open(path))}
+    return {(r["group"], r["name"]): r for r in json.load(open(path))}
+
+
+def check_results(d):
+    reg = load_registry(d)
     rows, ok_count = [], 0
     for (group, name), (*ref, want) in REFERENCE.items():
         r = reg.get((group, name))
         if r is None:
             rows.append([group, name, "-", f"{ref[0]:.1f}", "not run yet (run it with this --name and --group)"])
             continue
-        got = [100 * r["point"][m] for m in ("accuracy", "f1", "fpr", "recall")]
-        have = run_settings(r)
-        wrong = [k for k, v in want.items() if k in have and have[k] != v]
-        off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref)) or r["samples"] != 4260
-        if wrong:
-            note = "; ".join(f"{k} is {have[k]}, expected {want[k]}: check {HINT[k]}" for k in wrong)
-        elif off:
-            note = f"different result (F1 {got[1]:.1f}, expected {ref[1]:.1f}): check {HINT['result']}"
-        else:
-            note = "matches the reference" + ("" if have else " (settings not linked: use --model in 08_evaluate.py)")
-            ok_count += 1
-        rows.append([group, name, f"{got[0]:.1f}", f"{ref[0]:.1f}", note])
+        ok, note = compare_run(r)
+        ok_count += ok
+        rows.append([group, name, f"{100 * r['point']['accuracy']:.1f}", f"{ref[0]:.1f}", note])
     extra = sorted(k for k in reg if k not in REFERENCE)
     return rows, ok_count, extra
 

@@ -22,6 +22,10 @@ To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` an
 | `instr_config/` | Automatic assessment (`checkwork`) |
 | `docs/` | Student manual (to be written) |
 
+After every evaluation, `08_evaluate.py` prints the expected result of the run, whether the run matches it (or which
+parameter to check) and the progress over the 17 runs of the lab sheet; `15_explain.py` and
+`11_incident_report.py` print their expected results in the same way.
+
 Every step records a fingerprint of its input in `pipeline.json`; if an earlier step is re-run with
 other parameters, the later steps stop and say which steps to run again, and `07_infer.py` refuses
 a model prepared differently from the data (window, flows, normalization, features, n).

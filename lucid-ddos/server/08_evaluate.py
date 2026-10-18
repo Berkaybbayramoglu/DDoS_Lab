@@ -87,6 +87,20 @@ def main():
         json.dump(reg, fh, indent=1)
     print(f"-> added to {args.registry} (group '{args.group}', {sum(r['group'] == args.group for r in reg)} runs)")
 
+    # the lab is deterministic: compare this run with its expected result and show the progress
+    import check
+    entry = reg[-1]
+    if (args.group, args.name) in check.REFERENCE:
+        acc, f1, fpr = check.REFERENCE[(args.group, args.name)][:3]
+        ok, note = check.compare_run(entry)
+        print(f"expected result of this run: accuracy {acc:.1f} %, F1 {f1:.1f} %, false-positive rate {fpr:.1f} %")
+        print(f"your run: {'OK - ' if ok else 'CHECK - '}{note}")
+    else:
+        print(f"no expected result for '{args.name}' in group '{args.group}' (not a run of the lab sheet)")
+    done = sum(1 for r in reg if (r["group"], r["name"]) in check.REFERENCE and check.compare_run(r)[0])
+    total = len(check.REFERENCE)
+    print(f"progress: {done} of {total} runs of the lab sheet match the reference ({100 * done / total:.0f} %)")
+
 
 if __name__ == "__main__":
     main()

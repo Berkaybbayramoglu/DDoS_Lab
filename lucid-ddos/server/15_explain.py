@@ -24,6 +24,10 @@ import numpy as np
 import lablib
 
 
+# expected most important feature (and its accuracy drop in points) for the models of the lab sheet
+EXPECTED = {"global_lucid": ("tcp_win", 19.2), "global_lucid_ids": ("src_ip", 36.1), "global_lucid_n3": ("tcp_win", 3.4)}
+
+
 def accuracy_f1(y, p):
     tp = int(((p == 1) & (y == 1)).sum()); fp = int(((p == 1) & (y == 0)).sum())
     fn = int(((p == 0) & (y == 1)).sum())
@@ -123,6 +127,12 @@ def main():
                        ["feature", "kind", "accuracy drop (pp)", "range", "F1 drop (pp)"])
     print(f"errors by flow length (n = {n} packets per sample):")
     lablib.print_table(err_rows, ["packets in flow", "samples", "DDoS", "errors", "error rate"])
+    expected = EXPECTED.get(tag) if args.split == "test" and args.repeats == 5 else None
+    if expected:
+        name, drop = expected
+        ok = rows[0][0] == name and abs(100 * rows[0][1] - drop) <= 1.0
+        print(f"expected result: most important feature {name} (accuracy drop {drop:.1f} pp); yours: "
+              f"{rows[0][0]} ({100 * rows[0][1]:.1f} pp) -> {'OK - matches the reference' if ok else 'CHECK - differs: check the --model and --data of this run'}")
     print(f"-> {out}, {plot}")
 
 
