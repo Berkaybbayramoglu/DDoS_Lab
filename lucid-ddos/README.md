@@ -132,9 +132,9 @@ addresses of one /24 differ by less than 10^-6 after scaling and the shortcut ca
 address swap stays inside each network.
 
 Classical detection (test split): the SYN-rate threshold chosen on the training split (54 SYN/s;
-benign sources reach at most 3.4 SYN/s) catches every SYN and HTTP flood from one address (recall
-93.9 %, FPR 0 %); the 6 % it misses are the UDP and DNS reflection attacks of the CIC sample, which
-send no SYN. Spread over 50 bots, every bot stays near 3 SYN/s, inside the benign range: the tuned
+benign sources reach at most 3.4 SYN/s) catches every SYN and HTTP flood of the lab network (recall
+93.9 %, FPR 0 %); 131 of the 139 flows it misses are the UDP attacks (DNS reflection, UDP-Lag) of the CIC sample, whose source sends
+almost no SYN in those windows (0.3/s). Spread over 50 bots, every bot stays near 3 SYN/s, inside the benign range: the tuned
 threshold catches nothing (recall 0 %) and no threshold separates the two (best: recall 39 % at 8.6 %
 FPR, see the sweep in Figure 4b). LUCID judges each flow without addresses, so its decisions do not change.
 
@@ -233,6 +233,10 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
   on the computer: training on raw values (`none`) is numerically unstable, and tiny rounding
   differences between CPUs give different models (97.7 % here, 76.8 % on a GitHub runner).
   `check.py` therefore compares only the settings of that run (`VARIES`), and `08_evaluate.py` says so.
+  The CIC-only model tested on the lab network (`cic only (test lab)`) extrapolates far outside its
+  training range and varies a little as well (accuracy 40.0–43.8 %, FPR 14.8–22.2 % on four machines,
+  recall always 0 %); it is compared within 10 points (`RUN_TOLERANCE`). Every other run agreed within
+  0.2 points on the host, the VM, PyTorch's generic CPU kernels and two GitHub runners.
 - Time: one training (36,858 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
   lab part (23 evaluated runs) takes about 11 min of machine time on 1 CPU, the post-lab about 3 min.

@@ -197,6 +197,10 @@ HINT = {"norm_mode": "the --mode of 03_normalize.py", "features": "the --set of 
 # measured on two machines). Only their settings and sample count are compared.
 VARIES = {("normalization", "none")}
 TOLERANCE = 0.5                                                   # percentage points
+# A model applied to a network it was not trained on extrapolates far outside its training range, so
+# its result also differs a little between computers (accuracy 40.0-43.8 %, false-positive rate
+# 14.8-22.2 % measured on four machines; recall always 0 %). It is compared with a wider tolerance.
+RUN_TOLERANCE = {("shift", "cic only (test lab)"): 10.0}
 
 
 def run_settings(r):
@@ -223,7 +227,8 @@ def compare_run(r):
     have = run_settings(r)
     wrong = [k for k, v in want.items() if k in have and have[k] != v]
     samples = SAMPLES.get((r["group"], r["name"]), SAMPLES["default"])
-    off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref))
+    tol = RUN_TOLERANCE.get((r["group"], r["name"]), TOLERANCE)
+    off = any(abs(g - e) > tol for g, e in zip(got, ref))
     if wrong:
         return False, "; ".join(f"{k} is {have[k]}, expected {want[k]}: check {HINT[k]}" for k in wrong)
     if r["samples"] != samples:

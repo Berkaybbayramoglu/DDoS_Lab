@@ -117,7 +117,8 @@ def main():
     else:
         thr, how = args.threshold, "given with --threshold"
     ben_max = float(train_score[tr & (label == 0)].max())
-    att_min = float(train_score[tr & (label == 1)].min())
+    att_train = train_score[tr & (label == 1)]
+    att_med = float(np.median(att_train))
 
     score = source_counters(p, f, victims, pipe["window_s"], args.rule, args.bots, attackers)
     sel = split == args.split
@@ -140,7 +141,7 @@ def main():
     att_src = s[y == 1]
     print(f"classical detector, rule '{args.rule}': {RULES[args.rule]}, window t = {pipe['window_s']:g} s")
     print(f"threshold {thr:.2f} /s, {how}; on the training split benign sources reach at most "
-          f"{ben_max:.2f} /s and attacking sources at least {att_min:.2f} /s")
+          f"{ben_max:.2f} /s, attacking sources {att_med:.2f} /s (median)")
     if args.bots > 1:
         print(f"distributed attack: every attack spread over {args.bots} bot addresses "
               f"(per-source rate of the attack flows now {np.median(att_src):.2f} /s median)")
