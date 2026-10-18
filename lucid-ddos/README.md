@@ -235,7 +235,10 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
   `check.py` therefore compares only the settings of that run (`VARIES`), and `08_evaluate.py` says so.
   The CIC-only model tested on the lab network (`cic only (test lab)`) extrapolates far outside its
   training range and varies a little as well (accuracy 40.0–43.8 %, FPR 14.8–22.2 % on four machines,
-  recall always 0 %); it is compared within 10 points (`RUN_TOLERANCE`). Every other run agreed within
+  recall always 0 %); it is compared within 10 points (`RUN_TOLERANCE`). On processors with AVX-512,
+  PyTorch and oneDNN would use AVX-512 code that rounds differently (the `lucid_ids` training got
+  stuck on an AMD EPYC 9V45); `lablib.py` therefore limits both to AVX2 (`ATEN_CPU_CAPABILITY`,
+  `ONEDNN_MAX_CPU_ISA`) on every processor that has it. Every other run agreed within
   0.2 points on the host, the VM, PyTorch's generic CPU kernels and two GitHub runners.
 - Time: one training (36,858 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
