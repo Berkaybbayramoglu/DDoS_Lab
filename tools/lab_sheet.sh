@@ -5,6 +5,7 @@
 #   usage: lab_sheet.sh            (needs the lucid-server image; replaces work/, models/, results/)
 set -u
 SRV=$(cd "$(dirname "$0")/../lucid-ddos/server" && pwd)
+echo "CPU: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | xargs); $(grep -m1 -o 'avx512f' /proc/cpuinfo || echo 'no avx512')"
 D="docker --context default"
 mkdir -p "$SRV/data"; trap 'rmdir "$SRV/data" 2>/dev/null' EXIT    # mount point for home_tar/data
 $D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e PYTHONHASHSEED=42 -e HOME=/tmp -e MPLCONFIGDIR=/tmp \
