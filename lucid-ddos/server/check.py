@@ -97,9 +97,15 @@ def check_normalize(d):
     split = f["split"][n["sample"]]
     tr = n["X"][split == "train"]
     if pipe["norm_mode"] == "global":
+        if pipe.get("fit_on", "all") != "all":
+            tr = n["X"][(split == "train") & (lablib.sample_source(f["key"][n["sample"]]) == pipe["fit_on"])]
         rules.append(("train values inside [0, 1]", *ratio(int(((tr >= 0) & (tr <= 1 + 1e-6)).all(axis=1).sum()), len(tr))))
-        fitted = np.allclose(mins, raw[split == "train"].min(axis=0)) and np.allclose(maxs, raw[split == "train"].max(axis=0))
-        rules.append(("min/max fitted on the TRAIN split only", *ratio(int(fitted), 1)))
+        fit = split == "train"
+        if pipe.get("fit_on", "all") != "all":
+            fit &= lablib.sample_source(f["key"][n["sample"]]) == pipe["fit_on"]
+        fitted = np.allclose(mins, raw[fit].min(axis=0)) and np.allclose(maxs, raw[fit].max(axis=0))
+        rules.append(("min/max fitted on the TRAIN split only" + ("" if pipe.get("fit_on", "all") == "all"
+                      else f" ({pipe['fit_on']} samples)"), *ratio(int(fitted), 1)))
     if pipe["norm_mode"] == "theoretical":
         rules.append(("all values inside [0, 1]", *ratio(int(((n["X"] >= 0) & (n["X"] <= 1)).all(axis=1).sum()), len(raw))))
     return rules
@@ -138,31 +144,54 @@ def check_shape(d):
     return rules
 
 
-# Reference results of the lab sheet (Labtainer, seed 42, test split of 4,260 samples), in percent:
+# Reference results of the lab sheet (Labtainer, seed 42), in percent:
 # (group, name): (accuracy, F1, false-positive rate, recall, expected settings)
-LUCID = "lucid"
+# Test split: 4,551 samples of both networks (447 CIC-DDoS2019 sample, 4,104 lab network); the
+# feature runs and the "test lab"/"test cic" runs use only the samples of one network (SAMPLES).
 REFERENCE = {
-    ("normalization", "global"):      (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 100}),
-    ("normalization", "none"):        (99.91, 99.91, 0.19, 100.00, {"norm_mode": "none", "features": LUCID, "n_packets": 100}),
-    ("normalization", "theoretical"): (100.00, 100.00, 0.00, 100.00, {"norm_mode": "theoretical", "features": LUCID, "n_packets": 100}),
-    ("normalization", "batchnorm"):   (100.00, 100.00, 0.00, 100.00, {"norm_mode": "batchnorm", "features": LUCID, "n_packets": 100}),
-    ("features", "lucid (test)"):             (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100}),
-    ("features", "lucid (test_newaddr)"):     (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100}),
-    ("features", "lucid_ids (test)"):         (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid_ids", "n_packets": 100}),
-    ("features", "lucid_ids (test_newaddr)"): (52.93, 39.77, 25.35, 31.14, {"norm_mode": "global", "features": "lucid_ids", "n_packets": 100}),
-    ("features", "ids_only (test)"):          (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "ids_only", "n_packets": 100}),
-    ("features", "ids_only (test_newaddr)"):  (1.41, 0.00, 97.19, 0.00, {"norm_mode": "global", "features": "ids_only", "n_packets": 100}),
-    ("shape", "n=3"):   (75.21, 66.96, 0.00, 50.33, {"norm_mode": "global", "features": LUCID, "n_packets": 3}),
-    ("shape", "n=10"):  (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 10}),
-    ("shape", "n=50"):  (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 50}),
-    ("shape", "n=100"): (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 100}),
-    ("classical", "LUCID CNN"):               (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": LUCID, "n_packets": 100}),
-    ("classical", "syn threshold"):           (100.00, 100.00, 0.00, 100.00, {"rule": "syn", "bots": 1}),
-    ("classical", "syn threshold (50 bots)"): (50.09, 0.00, 0.00, 0.00, {"rule": "syn", "bots": 50}),
+    ("normalization", "global"):                (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("normalization", "none"):                  (97.69, 97.65, 0.00, 95.41, {"norm_mode": "none", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("normalization", "theoretical"):           (99.89, 99.89, 0.18, 99.96, {"norm_mode": "theoretical", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("normalization", "batchnorm"):             (99.98, 99.98, 0.00, 99.96, {"norm_mode": "batchnorm", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("features", "lucid (test)"):               (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("features", "lucid (test_newaddr)"):       (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("features", "lucid_ids (test)"):           (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid_ids", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("features", "lucid_ids (test_newaddr)"):   (40.42, 5.27, 24.63, 3.41, {"norm_mode": "global", "features": "lucid_ids", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("features", "ids_only (test)"):            (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "ids_only", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("features", "ids_only (test_newaddr)"):    (1.75, 0.00, 96.59, 0.00, {"norm_mode": "global", "features": "ids_only", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("shape", "n=3"):                           (79.28, 74.04, 0.09, 58.84, {"norm_mode": "global", "features": "lucid", "n_packets": 3, "fit_on": "all", "train_on": "all"}),
+    ("shape", "n=10"):                          (99.91, 99.91, 0.00, 99.83, {"norm_mode": "global", "features": "lucid", "n_packets": 10, "fit_on": "all", "train_on": "all"}),
+    ("shape", "n=50"):                          (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 50, "fit_on": "all", "train_on": "all"}),
+    ("shape", "n=100"):                         (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("classical", "LUCID CNN"):                 (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("classical", "syn threshold"):             (96.95, 96.86, 0.00, 93.92, {"rule": "syn", "bots": 1}),
+    ("classical", "syn threshold (50 bots)"):   (49.77, 0.00, 0.00, 0.00, {"rule": "syn", "bots": 50}),
+    ("shift", "cic only (test cic)"):           (99.78, 99.83, 0.00, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "cic", "train_on": "cic"}),
+    ("shift", "lab only (test cic)"):           (54.59, 49.38, 5.84, 33.79, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("shift", "cic + lab (test cic)"):          (99.55, 99.66, 0.65, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("shift", "cic only (test lab)"):           (42.76, 0.00, 16.86, 0.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "cic", "train_on": "cic"}),
+    ("shift", "lab only (test lab)"):           (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
+    ("shift", "cic + lab (test lab)"):          (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+}
+SAMPLES = {"default": 4551,
+    ("features", "lucid (test)"): 4104,
+    ("features", "lucid (test_newaddr)"): 4104,
+    ("features", "lucid_ids (test)"): 4104,
+    ("features", "lucid_ids (test_newaddr)"): 4104,
+    ("features", "ids_only (test)"): 4104,
+    ("features", "ids_only (test_newaddr)"): 4104,
+    ("shift", "cic only (test cic)"): 447,
+    ("shift", "lab only (test cic)"): 447,
+    ("shift", "cic + lab (test cic)"): 447,
+    ("shift", "cic only (test lab)"): 4104,
+    ("shift", "lab only (test lab)"): 4104,
+    ("shift", "cic + lab (test lab)"): 4104,
 }
 HINT = {"norm_mode": "the --mode of 03_normalize.py", "features": "the --set of 04_features.py",
         "n_packets": "the -n of 05_shape.py", "rule": "the --rule of 14_classical.py",
-        "bots": "the --bots of 14_classical.py", "result": "the --split of 07_infer.py or the input files"}
+        "bots": "the --bots of 14_classical.py", "fit_on": "the --fit-on of 03_normalize.py",
+        "train_on": "the --train-on of 06_train.py",
+        "result": "the --split and --source of 07_infer.py or the input files"}
 TOLERANCE = 0.5                                                   # percentage points
 
 
@@ -179,7 +208,8 @@ def run_settings(r):
     sets = {"lucid": lablib.LUCID_FEATURES, "lucid_ids": lablib.LUCID_FEATURES + lablib.ID_FEATURES,
             "ids_only": lablib.ID_FEATURES}
     feats = next((k for k, v in sets.items() if list(v) == list(pipe.get("features", []))), "custom")
-    return {"norm_mode": pipe.get("norm_mode"), "features": feats, "n_packets": pipe.get("n_packets")}
+    return {"norm_mode": pipe.get("norm_mode"), "features": feats, "n_packets": pipe.get("n_packets"),
+            "fit_on": pipe.get("fit_on", "all"), "train_on": pipe.get("train", {}).get("train_on", "all")}
 
 
 def compare_run(r):
@@ -188,7 +218,8 @@ def compare_run(r):
     got = [100 * r["point"][m] for m in ("accuracy", "f1", "fpr", "recall")]
     have = run_settings(r)
     wrong = [k for k, v in want.items() if k in have and have[k] != v]
-    off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref)) or r["samples"] != 4260
+    off = any(abs(g - e) > TOLERANCE for g, e in zip(got, ref)) or r["samples"] != SAMPLES.get(
+        (r["group"], r["name"]), SAMPLES["default"])
     if wrong:
         return False, "; ".join(f"{k} is {have[k]}, expected {want[k]}: check {HINT[k]}" for k in wrong)
     if off:

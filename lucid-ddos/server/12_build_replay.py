@@ -90,11 +90,6 @@ def main():
     f = lablib.load_npz(os.path.join(args.flows, "flows.npz"))
     p = lablib.load_npz(os.path.join(pipe["window_dir"], "packets.npz"))
     lablib.require_same(pipe, "packets_id", lablib.packets_id(p), pipe["window_dir"], "02_flows.py")
-    pcap = pipe["pcap"]
-    if not os.path.exists(pcap):                                 # stored path may be from another mount
-        pcap = os.path.join("data", os.path.basename(pcap))
-    if not os.path.exists(pcap):
-        raise SystemExit(f"capture not found ({pipe['pcap']} or {pcap})")
     os.makedirs(args.out, exist_ok=True)
 
     victim = lablib.ip_to_int(args.victim)
@@ -128,6 +123,16 @@ def main():
         part_of_sample[parts[name]] = k
     part_of_packet = part_of_sample[f["sample_of_packet"]]
     keep = part_of_packet >= 0
+    # the replayed flows all come from one capture (the lab network); read that one
+    captures = pipe["pcap"] if isinstance(pipe["pcap"], list) else [pipe["pcap"]]
+    files = np.unique(p["capture"][keep]) if "capture" in p else np.array([0])
+    if len(files) != 1:
+        raise SystemExit("the replayed flows come from several captures; give the --victim of one network")
+    pcap = captures[int(files[0])]
+    if not os.path.exists(pcap):                                 # stored path may be from another mount
+        pcap = os.path.join("data", os.path.basename(pcap))
+    if not os.path.exists(pcap):
+        raise SystemExit(f"capture not found ({captures[int(files[0])]} or {pcap})")
 
     # spread the flow starts over --duration seconds in recorded order; a flow's own packets move together
     val_samples = np.flatnonzero(part_of_sample >= 0)

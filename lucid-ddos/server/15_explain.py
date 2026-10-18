@@ -9,10 +9,11 @@ Learning outcome: judging what a model has learned and where it fails, instead o
   * Errors by flow length: the error rate of the model for short and long flows (packets of the
     flow in its window, before shaping). With a small n, flows longer than n packets are cut, and
     the packets that would show the difference may be missing.
-A model trained with IP addresses (lucid_ids) shows its shortcut here: the address features are
+A model trained with IP addresses (lucid_ids, on the lab network) shows its shortcut here: the address features are
 the most important ones.
 
 usage:  python3 15_explain.py --model models/global_lucid.pt --data work/05_shape_global_lucid --split test
+        python3 15_explain.py --model models/lab_lucid_ids.pt --data work/05_shape_lab_lucid_ids --source lab
 output: table on screen, results/explain_<model>.csv and results/plots/explain_<model>.png
 """
 import argparse
@@ -24,8 +25,10 @@ import numpy as np
 import lablib
 
 
-# expected most important feature (and its accuracy drop in points) for the models of the lab sheet
-EXPECTED = {"global_lucid": ("tcp_win", 19.2), "global_lucid_ids": ("src_ip", 36.1), "global_lucid_n3": ("tcp_win", 3.4)}
+# expected most important feature (and its accuracy drop in points) for the models of the lab sheet,
+# by (model, --source)
+EXPECTED = {("global", "all"): ("tcp_win", 14.7), ("lab_lucid_ids", "lab"): ("src_ip", 37.6),
+            ("global_lucid_n3", "all"): ("tcp_win", 12.1)}
 
 
 def accuracy_f1(y, p):
@@ -41,6 +44,8 @@ def main():
     a.add_argument("--model", required=True)
     a.add_argument("--data", required=True, help="output folder of 05_shape.py")
     a.add_argument("--split", choices=["test", "test_newaddr", "val"], default="test")
+    a.add_argument("--source", choices=["all", "cic", "lab"], default="all",
+                   help="explain only the samples of one network (cic = CIC-DDoS2019 sample, lab = lab network)")
     a.add_argument("--repeats", type=int, default=5)
     a.add_argument("--out", help="CSV (default results/explain_<model>.csv)")
     args = a.parse_args()
@@ -50,12 +55,15 @@ def main():
     ck = torch.load(args.model, map_location="cpu")
     pipe = ck["pipeline"]
     data_pipe = lablib.load_pipeline(args.data)
-    differ = [k for k in ("window_s", "flows_id", "norm_mode", "features", "n_packets")
+    differ = [k for k in ("window_s", "flows_id", "norm_mode", "fit_on", "features", "n_packets")
               if k in pipe and k in data_pipe and pipe[k] != data_pipe[k]]
     if differ:
         raise SystemExit(f"the model was trained on data prepared differently ({', '.join(differ)})")
     d = lablib.load_npz(os.path.join(args.data, f"{args.split}.npz"))
-    X, y = d["X"], d["y"].astype(int)
+    keep = np.ones(len(d["y"]), bool) if args.source == "all" else d["source"] == args.source
+    if not keep.any():
+        raise SystemExit(f"no {args.split} samples of the {args.source} network")
+    X, y, d = d["X"][keep], d["y"][keep].astype(int), {"sample": d["sample"][keep]}
     model = lablib.build_model(pipe["n_features"], pipe["train"]["kernels"], batchnorm=pipe.get("batchnorm", False))
     model.load_state_dict(ck["state"])
     model.eval()
@@ -120,14 +128,15 @@ def main():
     fig.savefig(plot, dpi=130)
     plt.close(fig)
 
-    print(f"model {args.model} on {args.split}: {len(y)} samples, accuracy {100 * acc0:.1f} %, F1 {100 * f10:.1f} %")
+    where = "" if args.source == "all" else f" ({lablib.SOURCES[args.source]})"
+    print(f"model {args.model} on {args.split}{where}: {len(y)} samples, accuracy {100 * acc0:.1f} %, F1 {100 * f10:.1f} %")
     print(f"permutation importance ({args.repeats} shuffles per feature, seed {lablib.SEED}):")
     lablib.print_table([[r[0], "identifier" if r[0] in lablib.ID_FEATURES else "header",
                          f"{100 * r[1]:.1f}", f"{100 * r[2]:.1f} .. {100 * r[3]:.1f}", f"{100 * r[4]:.1f}"] for r in rows],
                        ["feature", "kind", "accuracy drop (pp)", "range", "F1 drop (pp)"])
     print(f"errors by flow length (n = {n} packets per sample):")
     lablib.print_table(err_rows, ["packets in flow", "samples", "DDoS", "errors", "error rate"])
-    expected = EXPECTED.get(tag) if args.split == "test" and args.repeats == 5 else None
+    expected = EXPECTED.get((tag, args.source)) if args.split == "test" and args.repeats == 5 else None
     if expected:
         name, drop = expected
         ok = rows[0][0] == name and abs(100 * rows[0][1] - drop) <= 1.0

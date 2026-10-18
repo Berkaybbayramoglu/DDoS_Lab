@@ -17,10 +17,10 @@ it is blocked (BLOCK line), so a single false alarm does not cut a legitimate ho
 log (with the time each address was blocked) for the incident report.
 
 usage (offline, on a recorded pcap, no blocking):
-    python3 10_detect_block.py --model models/global_lucid.pt --pcap replay/attacker1.pcap \
+    python3 10_detect_block.py --model models/global.pt --pcap replay/attacker1.pcap \
             --victim 172.30.0.10 --out results/incident_offline.csv
 usage (live on the server interface, with blocking):
-    python3 10_detect_block.py --model models/global_lucid.pt --iface eth0 --victim 172.30.0.10 \
+    python3 10_detect_block.py --model models/global.pt --iface eth0 --victim 172.30.0.10 \
             --block --seconds 150 --out results/incident_live.csv
 """
 import argparse

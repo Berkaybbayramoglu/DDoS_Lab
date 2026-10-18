@@ -250,7 +250,33 @@ def fingerprint(*arrays):
 
 
 def packets_id(p):
+    if "capture" in p:
+        return fingerprint(p["capture"], p["frame"], p["ts"], p["window"])
     return fingerprint(p["frame"], p["ts"], p["window"])
+
+
+# The two networks of the lab dataset: the lab network (recorded for this lab, the network of the
+# post-lab) and the CIC-DDoS2019 testbed (sample of the LUCID authors). A sample belongs to the lab
+# network when one of its endpoints is in LAB_NET.
+LAB_NET = ("172.30.0.0", 24)
+SOURCES = {"cic": "CIC-DDoS2019 sample", "lab": "lab network"}
+
+
+def sample_source(key):
+    """'lab' or 'cic' for every sample key (rows of flows.npz 'key': ip_a, port_a, ip_b, port_b, proto)."""
+    net, bits = ip_to_int(LAB_NET[0]) >> (32 - LAB_NET[1]), 32 - LAB_NET[1]
+    lab = ((key[:, 0] >> bits) == net) | ((key[:, 2] >> bits) == net)
+    return np.where(lab, "lab", "cic")
+
+
+def network_of(ip):
+    """'lab' or 'cic' for one address (as int)."""
+    return "lab" if ip >> (32 - LAB_NET[1]) == ip_to_int(LAB_NET[0]) >> (32 - LAB_NET[1]) else "cic"
+
+
+def is_private(ip):
+    """True for a private unicast address (10/8, 172.16/12, 192.168/16)."""
+    return ip >> 24 == 10 or ip >> 20 == 0xAC1 or ip >> 16 == 0xC0A8
 
 
 def flows_id(f):

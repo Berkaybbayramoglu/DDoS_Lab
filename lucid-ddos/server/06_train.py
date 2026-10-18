@@ -26,6 +26,8 @@ def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument("--data", required=True, help="output folder of 05_shape.py")
     a.add_argument("--model", required=True, help="where to save the trained model (.pt)")
+    a.add_argument("--train-on", dest="train_on", choices=["all", "cic", "lab"], default="all",
+                   help="train on the samples of this network only (cic = CIC-DDoS2019 sample, lab = lab network)")
     a.add_argument("--epochs", type=int, default=10)
     a.add_argument("--batch", type=int, default=64)
     a.add_argument("--lr", type=float, default=0.01)
@@ -37,7 +39,10 @@ def main():
 
     pipe = lablib.load_pipeline(args.data)
     d = lablib.load_npz(os.path.join(args.data, "train.npz"))
-    X, y = torch.from_numpy(d["X"]), torch.from_numpy(d["y"].astype(np.float32))
+    keep = np.ones(len(d["y"]), bool) if args.train_on == "all" else d["source"] == args.train_on
+    if not keep.any():
+        raise SystemExit(f"no training samples of the {args.train_on} network")
+    X, y = torch.from_numpy(d["X"][keep]), torch.from_numpy(d["y"][keep].astype(np.float32))
     model = lablib.build_model(X.shape[2], args.kernels, batchnorm=pipe.get("batchnorm", False))
     opt = torch.optim.Adam(model.parameters(), lr=args.lr, eps=1e-7)
     gen = torch.Generator().manual_seed(lablib.SEED)
@@ -60,7 +65,7 @@ def main():
 
     os.makedirs(os.path.dirname(args.model) or ".", exist_ok=True)
     pipe.update({"step": "06_train", "shape_dir": args.data,
-                 "train": {"epochs": args.epochs, "batch": args.batch, "lr": args.lr, "kernels": args.kernels,
+                 "train": {"train_on": args.train_on, "epochs": args.epochs, "batch": args.batch, "lr": args.lr, "kernels": args.kernels,
                            "seed": lablib.SEED, "samples": len(X), "seconds": time.perf_counter() - t0}})
     torch.save({"state": model.state_dict(), "pipeline": pipe}, args.model)
     with open(os.path.splitext(args.model)[0] + "_train_log.json", "w") as fh:
@@ -68,7 +73,7 @@ def main():
 
     shown = rows if len(rows) <= 6 else rows[:3] + [["...", "", "", ""]] + rows[-3:]
     lablib.print_table(shown, ["epoch", "train loss", "train accuracy", "elapsed (s)"])
-    print(f"{len(X)} training samples, {args.epochs} epochs in {time.perf_counter() - t0:.1f} s -> {args.model}")
+    print(f"{len(X)} training samples ({lablib.SOURCES.get(args.train_on, 'both networks')}), {args.epochs} epochs in {time.perf_counter() - t0:.1f} s -> {args.model}")
 
 
 if __name__ == "__main__":

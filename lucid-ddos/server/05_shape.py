@@ -34,20 +34,31 @@ def swapped_address_features(pipe, f, sample_sorted_order, columns):
     keep = np.flatnonzero(f["selected"][f["sample_of_packet"]])[sample_sorted_order]  # as in 03_normalize.py
     victims = {lablib.ip_to_int(x) for x in pipe["victims"]}
     attackers = sorted({lablib.ip_to_int(x) for x in pipe["attackers"]})
-    # benign clients = unicast hosts that talked to a victim in the test split (no gateway noise,
-    # no multicast addresses)
-    test = f["split"] == "test"
-    a, b = f["key"][test, 0], f["key"][test, 2]
-    to_victim = np.isin(a, list(victims)) | np.isin(b, list(victims))
-    ends = np.concatenate([a[to_victim], b[to_victim]])
-    benign = sorted({int(x) for x in ends if not 224 <= int(x) >> 24 <= 239} - victims - set(attackers))
-    if not benign or not attackers:
-        return None
+    # Addresses are swapped inside each network only (CIC-DDoS2019 testbed, lab network): every
+    # attacker takes the address of a benign client of its own network and that client takes the
+    # attacker's. Benign clients = private unicast hosts of the benign test samples (no victims,
+    # gateways or multicast addresses); in the lab network only hosts that talked to a victim.
+    test = (f["split"] == "test") & f["selected"]
+    key, benign_flow = f["key"][test], f["label"][test] == 0
+    source = lablib.sample_source(key)
     swap = {}
-    for i, a in enumerate(attackers):                 # attacker -> a benign client's address ...
-        swap[a] = benign[i % len(benign)]
-    for i, b in enumerate(benign):                    # ... and that client -> an attacker address
-        swap[b] = attackers[i % len(attackers)]
+    for net in lablib.SOURCES:
+        m = (source == net) & benign_flow
+        a, b = key[m, 0], key[m, 2]
+        touches = np.isin(a, list(victims)) | np.isin(b, list(victims))
+        if touches.any():
+            a, b = a[touches], b[touches]
+        ends = {int(x) for x in np.concatenate([a, b]) if lablib.is_private(int(x))}
+        benign = sorted(ends - victims - set(attackers) - {x for x in ends if x & 0xFF == 1})
+        own = [x for x in attackers if lablib.network_of(x) == net]
+        for i, x in enumerate(own):                   # attacker -> a benign client's address ...
+            swap[x] = benign[i % len(benign)] if benign else x
+        for i, x in enumerate(benign):                # ... and that client -> an attacker address
+            if own:
+                swap[x] = own[i % len(own)]
+    swap = {k: v for k, v in swap.items() if k != v}
+    if not swap:
+        return None
     names = lablib.ALL_FEATURES
     mins, maxs = np.array(pipe["norm_min"]), np.array(pipe["norm_max"])
     span = np.where(maxs > mins, maxs - mins, 1.0)
@@ -100,7 +111,8 @@ def main():
             k = min(lengths[j], n)                                   # truncation after n packets
             M[r, :k] = src[starts[j]:starts[j] + k]
         y = f["label"][ids[sel]]
-        np.savez_compressed(os.path.join(args.out, f"{split}.npz"), X=M, y=y, sample=ids[sel])
+        np.savez_compressed(os.path.join(args.out, f"{split}.npz"), X=M, y=y, sample=ids[sel],
+                            source=lablib.sample_source(f["key"][ids[sel]]))
         L = lengths[sel]
         rows.append([split, f"{M.shape}", int(y.sum()), int(len(y) - y.sum()),
                      f"{100 * (1 - np.minimum(L, n).sum() / (len(sel) * n)):.1f} %",

@@ -36,6 +36,9 @@ def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument("--in", dest="inp", default="work/02_flows")
     a.add_argument("--mode", choices=["none", "theoretical", "global", "batchnorm"], required=True)
+    a.add_argument("--fit-on", dest="fit_on", choices=["all", "cic", "lab"], default="all",
+                   help="global mode: fit min/max on the training samples of this network only "
+                        "(cic = CIC-DDoS2019 sample, lab = lab network, all = both)")
     a.add_argument("--out", default=None)
     args = a.parse_args()
     out = args.out or f"work/03_norm_{args.mode}"
@@ -52,7 +55,10 @@ def main():
         mins = np.zeros(len(names))
         maxs = np.array([pipe["window_s"] if n == "time" else lablib.THEORETICAL_MAX[n] for n in names], float)
     elif args.mode == "global":
-        tr = X[split == "train"]
+        fit = split == "train"
+        if args.fit_on != "all":
+            fit &= lablib.sample_source(f["key"][sample]) == args.fit_on
+        tr = X[fit]
         mins, maxs = tr.min(axis=0), tr.max(axis=0)
     else:
         mins, maxs = np.zeros(len(names)), np.ones(len(names))     # identity (none / batchnorm)
@@ -62,7 +68,8 @@ def main():
     os.makedirs(out, exist_ok=True)
     np.savez_compressed(os.path.join(out, "features.npz"), X=Xn, sample=sample, columns=np.array(names))
     pipe.update({"step": "03_normalize", "flow_dir": args.inp, "norm_mode": args.mode,
-                 "norm_min": mins.tolist(), "norm_max": maxs.tolist(), "batchnorm": args.mode == "batchnorm"})
+                 "norm_min": mins.tolist(), "norm_max": maxs.tolist(), "batchnorm": args.mode == "batchnorm",
+                 "fit_on": args.fit_on if args.mode == "global" else "all"})
     lablib.save_pipeline(out, pipe)
 
     rows = []

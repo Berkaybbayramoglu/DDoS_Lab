@@ -86,13 +86,16 @@ for g in goals:
 check("goals refer to existing results", used <= tags, ", ".join(sorted(used - tags)))
 
 # dataset
-pcap = os.path.join(LAB, "server", "home_tar", "data", "lab_traffic.pcap.gz")
-ok = os.path.isfile(pcap)
-if ok:
-    with gzip.open(pcap, "rb") as fh:
-        ok = fh.read(4) in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4", b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d")
-check("dataset is a gzip'ed pcap", ok)
-check("dataset below 100 MB", os.path.isfile(pcap) and os.path.getsize(pcap) < 100 * 2**20)
+for name in ("lab_traffic.pcap.gz", "cic_ddos2019_sample.pcap.gz"):
+    pcap = os.path.join(LAB, "server", "home_tar", "data", name)
+    ok = os.path.isfile(pcap)
+    if ok:
+        with gzip.open(pcap, "rb") as fh:
+            ok = fh.read(4) in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4", b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d")
+    check(f"dataset {name} is a gzip'ed classic pcap", ok)
+    check(f"dataset {name} below 100 MB", os.path.isfile(pcap) and os.path.getsize(pcap) < 100 * 2**20)
+check("dataset source and licence documented",
+      all(os.path.isfile(os.path.join(LAB, "server", "home_tar", "data", f)) for f in ("README.txt", "LICENSE-lucid-ddos.txt")))
 
 print(f"\n{len(failures)} check(s) failed" if failures else "\nall checks passed")
 sys.exit(1 if failures else 0)

@@ -18,12 +18,12 @@ To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` an
 | `config/start.config` | Network `LAB_LAN` 172.30.0.0/24; `server` .10 (2 CPUs, 2 terminals, X11), `attacker1` .66, `attacker2` .67, `client` .20 (1 CPU each, no terminal). All with `NO_GW` and `ADD-HOST LAB_LAN` |
 | `dockerfiles/` | Based on `labtainer.network3` (Ubuntu 24.04, Python 3.12). Server: tshark, iptables, feh, PyTorch 2.6.0 CPU, numpy 1.26.4, matplotlib 3.11.2, `PYTHONHASHSEED=42`. Traffic containers: tcpreplay, hping3, curl |
 | `server/` | Scripts copied into the student's home directory (01–13, `check.py`, `lablib.py`) |
-| `server/home_tar/data/lab_traffic.pcap.gz` | The lab dataset (44 MB compressed, 947 MB uncompressed; tshark reads it directly). Kept in `home_tar/` so it is not collected as a student artifact |
+| `server/home_tar/data/` | The lab dataset: `cic_ddos2019_sample.pcap.gz` (the CIC-DDoS2019 sample of the LUCID authors, 7 MB) and `lab_traffic.pcap.gz` (recorded on the lab network, 44 MB compressed, 947 MB uncompressed), with `README.txt` (source, citation) and `LICENSE-lucid-ddos.txt`. tshark reads the files directly. Kept in `home_tar/` so they are not collected as a student artifact |
 | `instr_config/` | Automatic assessment (`checkwork`) |
 | `docs/` | Student manual (to be written) |
 
 After every evaluation, `08_evaluate.py` prints the expected result of the run, whether the run matches it (or which
-parameter to check) and the progress over the 17 runs of the lab sheet; `15_explain.py` and
+parameter to check) and the progress over the 23 runs of the lab sheet; `15_explain.py` and
 `11_incident_report.py` print their expected results in the same way.
 
 Every step records a fingerprint of its input in `pipeline.json`; if an earlier step is re-run with
@@ -36,11 +36,11 @@ a model prepared differently from the data (window, flows, normalization, featur
 | --- | --- | --- | --- |
 | 1 | `01_window.py` | Capturing packets in time windows (t = 100 s; the next window starts at the first packet after the previous window ended) | `work/01_window/` |
 | 2 | `02_flows.py` | Bidirectional 5-tuple flows, labelling, train/val/test split by flow | `work/02_flows/` |
-| 3 | `03_normalize.py` | Scaling: `none` / `theoretical` (paper) / `global` (from the data) / `batchnorm` | `work/03_norm_*/` |
+| 3 | `03_normalize.py` | Scaling: `none` / `theoretical` (paper) / `global` (from the data; `--fit-on cic/lab` fits it on one network) / `batchnorm` | `work/03_norm_*/` |
 | 4 | `04_features.py` | Feature selection; IP addresses and ports invite shortcut learning | `work/04_feat_*/` |
 | 5 | `05_shape.py` | n × f matrix per sample; zero padding if shorter, cut if longer | `work/05_shape_*/` |
-| 6 | `06_train.py` | Training the 2D CNN (fixed epochs, no validation) | `models/*.pt` |
-| 7 | `07_infer.py` | Inference with a saved model (only parameters are given) | `results/*.csv` |
+| 6 | `06_train.py` | Training the 2D CNN (fixed epochs, no validation; `--train-on cic/lab` uses one network only) | `models/*.pt` |
+| 7 | `07_infer.py` | Inference with a saved model (only parameters are given; `--source cic/lab` tests on one network) | `results/*.csv` |
 | 8 | `08_evaluate.py` | Metrics + 95 % bootstrap confidence intervals; appends to a registry | `results/registry.json` |
 | 9 | `09_plot.py` | Comparison figure per experiment + confidence interval table (view with `feh -. results/plots/figure1_normalization.png`; `-.` fits the figure to the window) | `results/plots/` |
 | 14 | `14_classical.py` | Classical detection: a per-source threshold (SYN or packets per second in a window), tuned on the training split; `--bots K` spreads the attack over K bot addresses | `results/classical_*.csv` (+ `.sweep.json`) |
@@ -48,11 +48,12 @@ a model prepared differently from the data (window, flows, normalization, featur
 | – | `check.py` | Checks the rules of every preprocessing step independently; `--stage results` compares every run of the lab sheet with the reference results (settings and metrics) | table on screen |
 
 ```bash
-python3 01_window.py --pcap data/lab_traffic.pcap.gz -t 100 --out work/01_window
-python3 02_flows.py  --in work/01_window --attackers 172.30.0.66 172.30.0.67 --victims 172.30.0.10 --out work/02_flows
+python3 01_window.py --pcap data/cic_ddos2019_sample.pcap.gz data/lab_traffic.pcap.gz -t 100 --out work/01_window
+python3 02_flows.py  --in work/01_window --attackers 172.16.0.5 172.30.0.66 172.30.0.67 \
+                     --victims 192.168.50.1 192.168.50.4 172.30.0.10 --out work/02_flows
 
-# Normalization experiment
-for m in none theoretical global batchnorm; do
+# Normalization experiment (the global run is steps 3-8 of the manual; models/global.pt is the model of the post-lab)
+for m in global none theoretical batchnorm; do
   python3 03_normalize.py --in work/02_flows --mode $m
   python3 04_features.py  --in work/03_norm_$m --set lucid --out work/04_feat_${m}_lucid
   python3 05_shape.py     --in work/04_feat_${m}_lucid -n 100 --out work/05_shape_${m}_lucid
@@ -61,16 +62,19 @@ for m in none theoretical global batchnorm; do
   python3 08_evaluate.py  --pred results/${m}.csv --name $m --group normalization --model models/${m}.pt
 done
 
-# Feature selection experiment (IP/port = risk of memorising addresses). Every model is tested twice:
+# Feature selection experiment (IP/port = risk of memorising addresses), on the lab network: min-max
+# fitted on its training samples (--fit-on lab), trained on them (--train-on lab), tested on them
+# (--source lab). Every model is tested twice:
 #   test          the normal test split
 #   test_newaddr  the same flows with the attacker and benign client addresses swapped
+python3 03_normalize.py --in work/02_flows --mode global --fit-on lab --out work/03_norm_global_lab
 for s in lucid lucid_ids ids_only; do
-  python3 04_features.py --in work/03_norm_global --set $s --out work/04_feat_global_$s
-  python3 05_shape.py    --in work/04_feat_global_$s -n 100 --out work/05_shape_global_$s
-  python3 06_train.py    --data work/05_shape_global_$s --model models/global_$s.pt
+  python3 04_features.py --in work/03_norm_global_lab --set $s --out work/04_feat_lab_$s
+  python3 05_shape.py    --in work/04_feat_lab_$s -n 100 --out work/05_shape_lab_$s
+  python3 06_train.py    --data work/05_shape_lab_$s --train-on lab --model models/lab_$s.pt
   for sp in test test_newaddr; do
-    python3 07_infer.py    --model models/global_$s.pt --data work/05_shape_global_$s --split $sp --out results/global_${s}_$sp.csv
-    python3 08_evaluate.py --pred results/global_${s}_$sp.csv --name "$s ($sp)" --group features --model models/global_$s.pt
+    python3 07_infer.py    --model models/lab_$s.pt --data work/05_shape_lab_$s --split $sp --source lab --out results/lab_${s}_$sp.csv
+    python3 08_evaluate.py --pred results/lab_${s}_$sp.csv --name "$s ($sp)" --group features --model models/lab_$s.pt
   done
 done
 
@@ -82,42 +86,67 @@ for n in 3 10 50 100; do
   python3 08_evaluate.py --pred results/global_lucid_n$n.csv --name n=$n --group shape --model models/global_lucid_n$n.pt
 done
 
-# Classical detection vs. LUCID (results/global_lucid_test.csv comes from the feature experiment;
-# the rule is tuned on the training split; --bots 50 = the same attack from 50 bots)
-python3 08_evaluate.py  --pred results/global_lucid_test.csv --name "LUCID CNN" --group classical --model models/global_lucid.pt
+# Classical detection vs. LUCID (the rule is tuned on the training split; --bots 50 = the same
+# attack from 50 bots)
+python3 08_evaluate.py  --pred results/global.csv --name "LUCID CNN" --group classical --model models/global.pt
 python3 14_classical.py --flows work/02_flows --rule syn --split test --out results/classical_syn.csv
 python3 08_evaluate.py  --pred results/classical_syn.csv --name "syn threshold" --group classical
 python3 14_classical.py --flows work/02_flows --rule syn --split test --bots 50 --out results/classical_syn_bots50.csv
 python3 08_evaluate.py  --pred results/classical_syn_bots50.csv --name "syn threshold (50 bots)" --group classical
 
+# What the models rely on and where they fail
+python3 15_explain.py --model models/global.pt          --data work/05_shape_global_lucid
+python3 15_explain.py --model models/lab_lucid_ids.pt   --data work/05_shape_lab_lucid_ids --source lab
+python3 15_explain.py --model models/global_lucid_n3.pt --data work/05_shape_global_lucid_n3
+
+# Training on another network: a model trained on one network only, tested on both networks
+python3 03_normalize.py --in work/02_flows --mode global --fit-on cic --out work/03_norm_global_cic
+python3 04_features.py  --in work/03_norm_global_cic --set lucid --out work/04_feat_cic_lucid
+python3 05_shape.py     --in work/04_feat_cic_lucid -n 100 --out work/05_shape_cic_lucid
+python3 06_train.py     --data work/05_shape_cic_lucid --train-on cic --model models/cic_lucid.pt
+for src in cic lab; do
+  python3 07_infer.py    --model models/cic_lucid.pt --data work/05_shape_cic_lucid --split test --source $src --out results/cic_only_test_$src.csv
+  python3 08_evaluate.py --pred results/cic_only_test_$src.csv --name "cic only (test $src)" --group shift --model models/cic_lucid.pt
+  python3 07_infer.py    --model models/lab_lucid.pt --data work/05_shape_lab_lucid --split test --source $src --out results/lab_only_test_$src.csv
+  python3 08_evaluate.py --pred results/lab_only_test_$src.csv --name "lab only (test $src)" --group shift --model models/lab_lucid.pt
+  python3 07_infer.py    --model models/global.pt --data work/05_shape_global_lucid --split test --source $src --out results/both_test_$src.csv
+  python3 08_evaluate.py --pred results/both_test_$src.csv --name "cic + lab (test $src)" --group shift --model models/global.pt
+done
+
 # Comparison figures + confidence interval tables
-python3 09_plot.py --groups normalization features shape classical
+python3 09_plot.py --groups normalization features shape classical shift
 
 # Every run compared with the reference results of the lab (settings + metrics within 0.5 points)
 python3 check.py --stage results --dir results
-
-# What the models rely on and where they fail
-python3 15_explain.py --model models/global_lucid.pt     --data work/05_shape_global_lucid
-python3 15_explain.py --model models/global_lucid_ids.pt --data work/05_shape_global_lucid_ids
-python3 15_explain.py --model models/global_lucid_n3.pt  --data work/05_shape_global_lucid_n3
 ```
 
-Measured (test split of 4,260 samples): normalization raw 99.9 % · theoretical / global / batchnorm
-100 % (the difference shows in the training loss, see below); shaping n = 3 75.2 % · n = 10 / 50 / 100
-100 %. Feature selection (accuracy, test → test_newaddr): `lucid` 100 % → 100 % · `lucid_ids` 100 % →
-52.9 % · `ids_only` 100 % → 1.4 %. On the normal test split all three look perfect; once the addresses
-change, only the address-free LUCID features hold up (shortcut learning).
+Measured (test split of 4,551 samples: 447 of the CIC-DDoS2019 sample, 4,104 of the lab network):
+normalization raw 97.7 % · theoretical 99.9 % · global 100.0 % · batchnorm 100.0 % (the difference also
+shows in the training loss, see below); shaping n = 3 79.3 % · n = 10 / 50 / 100 99.9–100 %.
 
-Classical detection (test split): the SYN-rate threshold chosen on the training split (54 SYN/s; benign
-sources reach at most 3.4 SYN/s, the attacker at least 105) is perfect while the attack comes from one
-address. Spread over 50 bots, every bot stays near 3 SYN/s, inside the benign range: the tuned threshold
-catches nothing (recall 0 %) and no threshold separates the two (best: recall 51 % at 10.5 % FPR, see
-the sweep in Figure 4b). LUCID judges each flow without addresses, so its decisions do not change.
+Feature selection (lab network, accuracy, test → test_newaddr): `lucid` 100 % → 100 % · `lucid_ids`
+100 % → 40.4 % · `ids_only` 100 % → 1.8 %. On the normal test split all three look perfect; once the
+addresses change, only the address-free LUCID features hold up (shortcut learning). The experiment runs
+on the lab network because, with one min-max scaling for both networks (172.16.x to 192.168.x), the
+addresses of one /24 differ by less than 10^-6 after scaling and the shortcut cannot be seen; the
+address swap stays inside each network.
 
-Explanation (`15_explain.py`): the LUCID model relies on tcp_win, packet_len, tcp_len and highest_layer
-(accuracy drop 14–19 points each when shuffled); the lucid_ids model relies only on src_ip (36 points);
-the n = 3 model misses all 1,056 HTTP-flood flows longer than 10 packets, whose first 3 packets look like
-benign HTTP.
+Classical detection (test split): the SYN-rate threshold chosen on the training split (54 SYN/s;
+benign sources reach at most 3.4 SYN/s) catches every SYN and HTTP flood from one address (recall
+93.9 %, FPR 0 %); the 6 % it misses are the UDP and DNS reflection attacks of the CIC sample, which
+send no SYN. Spread over 50 bots, every bot stays near 3 SYN/s, inside the benign range: the tuned
+threshold catches nothing (recall 0 %) and no threshold separates the two (best: recall 39 % at 8.6 %
+FPR, see the sweep in Figure 4b). LUCID judges each flow without addresses, so its decisions do not change.
+
+Explanation (`15_explain.py`): the LUCID model relies on tcp_win, highest_layer and tcp_len (accuracy
+drop 9–15 points each when shuffled); the lucid_ids model relies only on src_ip (38 points); the
+n = 3 model misses 943 of the 950 attack flows longer than 10 packets (HTTP floods), whose first 3
+packets look like benign HTTP.
+
+Training on another network (accuracy, tested on CIC sample / lab network): trained on the CIC
+sample only 99.8 % / 42.8 % (no lab attack found) · on the lab network only 54.6 % / 100 % · on both
+99.6 % / 100 %. A model detects the attacks of the networks it was trained on; the lab therefore
+trains on both, and the post-lab defends the lab network.
 
 ## Post-lab (server + attacker1 + attacker2 + client)
 
@@ -167,37 +196,43 @@ Replay details (`13_launch_replay.sh`, `*/replay_attack.sh`):
 
 ## Dataset
 
-`server/home_tar/data/lab_traffic.pcap.gz` holds six sessions: 2 benign, 2 SYN flood, 2 HTTP flood
-(10 parallel loops). Each session lasts about 185 s (60 s benign, 60 s attack on top of the benign
-traffic, 60 s benign), with 400 s of silence between sessions. The benign side has 17 users with
-different behaviour (172.30.0.20–36, `../tools/benign_clients.py`): 3 browse (a page + 2–6 parallel
-requests), 2 api (frequent small requests), 4 keepalive (3–10 requests on one connection),
-4 download (50–300 kB) and 4 slow (a large file read in small chunks). Offloads (TSO/GSO/GRO) are off
-while recording, so every frame is at most 1514 bytes, as on a physical link.
+Two captures, read together by `01_window.py` (`server/home_tar/data/README.txt` has the source and
+citation of each):
 
-| | Count |
-|---|---|
-| Packets | 1.8 million (947 MB; 44 MB with gzip because the served files are zero bytes) |
-| Samples (window × flow) | 135,154 (113,854 DDoS, 21,300 benign) |
-| Balanced set | 42,600 → train 34,506 · val 3,834 · test 4,260 |
-| Attack types (selected) | SYN ~50 % · HTTP ~50 % |
-| Benign user types | browse 46.5 % · api 28.8 % · download 8.4 % · slow 8.1 % · keepalive 8.0 % |
+- `cic_ddos2019_sample.pcap.gz`: the CIC-DDoS2019 sample that the LUCID authors publish with their code
+  (https://github.com/doriguzzi/lucid-ddos, `sample-dataset`, Apache-2.0): benign traffic and DNS
+  reflection, SYN flood, UDP-Lag and Web DDoS, merged in time order. Attacker 172.16.0.5, victims
+  192.168.50.1 and 192.168.50.4 (I. Sharafaldin et al., ICCST 2019).
+- `lab_traffic.pcap.gz`: recorded for this lab on the lab network. Six sessions: 2 benign, 2 SYN
+  flood, 2 HTTP flood (10 parallel loops). Each session lasts about 185 s (60 s benign, 60 s attack on
+  top of the benign traffic, 60 s benign), with 400 s of silence between sessions. The benign side has
+  17 users with different behaviour (172.30.0.20–36, `../tools/benign_clients.py`): 3 browse (a page +
+  2–6 parallel requests), 2 api (frequent small requests), 4 keepalive (3–10 requests on one
+  connection), 4 download (50–300 kB) and 4 slow (a large file read in small chunks). Offloads
+  (TSO/GSO/GRO) are off while recording, so every frame is at most 1514 bytes, as on a physical link.
 
-Every benign user type has 150+ test samples, so errors can be measured per type (currently 0 in
-every type). To regenerate: `../tools/build_lab_dataset.sh` (about 20 minutes).
+| | CIC-DDoS2019 sample | Lab network | Both |
+|---|---|---|---|
+| Packets | 80,100 | 1,805,644 | 1,885,744 |
+| Samples (window × flow) | 18,556 (17,104 DDoS) | 135,154 (113,854 DDoS) | 153,710 |
+| Balanced set | 4,455 | 41,049 | 45,504 → train 36,858 · val 4,095 · test 4,551 |
+| Test split | 447 | 4,104 | 4,551 |
+
+The balanced set takes every benign sample of both networks and as many DDoS samples, drawn from both.
+The post-lab replays only validation flows of the lab network. To regenerate both captures:
+`../tools/build_lab_dataset.sh` (about 20 minutes; it downloads the CIC sample from the LUCID repository).
 
 ## Measured results (inside the Labtainer VM, clean build, 1 vCPU per step)
 
 - Preprocessing checks (`check.py`): 100 % for window, flows, normalize, features and shape.
-- Normalization: test accuracy is about 100 % for all modes (raw 99.9 %); the difference is in the
-  training loss (Figure 1b). Raw values make the loss jump between 10^2 and 10^5 without
-  converging; theoretical (super-global) min-max learns smoothly but slowly (0.3 → 0.002); global
-  and batchnorm learn fast (about 10^-6 within 5–9 epochs). The question for students is not
+- Normalization: raw values reach 97.7 % and their loss stays large (about 3·10^4 after 10 epochs,
+  Figure 1b); theoretical (super-global) min-max learns smoothly but more slowly (final loss 0.005)
+  than global (0.002) and batchnorm (0.0016), which reach 99.96–99.98 %. The question for students is not
   "which is more accurate" but "which learns better and more stably, and why".
 - The same results come out on the host (plain Docker) and in the VM, run for run.
-- Time: one training (34,506 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
+- Time: one training (36,858 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
-  lab part takes about 13 min of machine time, the post-lab about 3 min.
+  lab part (23 evaluated runs) takes about 11 min of machine time on 1 CPU, the post-lab about 3 min.
 - Post-lab (run twice in a row in Labtainer): replay of about 3,500 validation flows (one sample per
   flow; 45 + 46 + 241 duplicate samples left out) in about 70 s; both attackers blocked a few seconds
   after the first attack flow, the benign client not blocked. Recall 100 %, FPR 0 %; no flow of the
@@ -208,11 +243,12 @@ every type). To regenerate: `../tools/build_lab_dataset.sh` (about 20 minutes).
 | Goal | Source |
 | --- | --- |
 | `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass`" |
-| `results_check` | `check.py --stage results`: all 17 runs of the lab sheet match the reference |
+| `results_check` | `check.py --stage results`: all 23 runs of the lab sheet match the reference |
 | `normalization_compared`, `features_compared`, `shape_compared` | `09_plot.py` stdout (one figure per experiment) |
 | `address_swap_tested` | `07_infer.py` was run on the `test_newaddr` split |
 | `classical_tested`, `classical_compared` | `14_classical.py` was run with `--bots`; `09_plot.py` drew the classical figure |
 | `decisions_explained` | `15_explain.py` printed a permutation importance |
+| `network_shift_tested`, `shift_compared` | `07_infer.py` tested a model trained on the CIC sample on the lab network; `09_plot.py` drew the shift figure |
 | `incident_report`, `attacker1_blocked`, `attacker2_blocked` | `results/incident_report.txt` |
 | `only_attackers_blocked` | Both attackers listed and exactly 2 addresses blocked (the client was not) |
 

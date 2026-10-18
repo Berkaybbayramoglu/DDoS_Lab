@@ -93,7 +93,9 @@ def figure(k, group, runs, out_dir):
     t.set_fontsize(7.5)
     t.auto_set_column_width(list(range(5)))
     t.scale(1, 1.15)
-    ax3.set_title(f"Table {k} – bootstrap statistics ({runs[0]['samples']} test samples per run)")
+    sizes = sorted({r["samples"] for r in runs})
+    size = f"{sizes[0]} test samples per run" if len(sizes) == 1 else f"{' or '.join(map(str, sizes))} test samples per run"
+    ax3.set_title(f"Table {k} – bootstrap statistics ({size})")
     fig.tight_layout()
     path = os.path.join(out_dir, f"figure{k}_{group}.png")
     fig.savefig(path, dpi=130)

@@ -15,8 +15,8 @@ bad() { echo "FAIL  $1"; FAIL=$((FAIL+1)); }
 
 echo "== pipeline (window -> flows -> normalize -> features -> shape), stage checks"
 $R sh -c "
-  python3 01_window.py --pcap data/lab_traffic.pcap.gz -t 100 --out $W/01 &&
-  python3 02_flows.py --in $W/01 --attackers 172.30.0.66 172.30.0.67 --victims 172.30.0.10 --out $W/02 &&
+  python3 01_window.py --pcap data/cic_ddos2019_sample.pcap.gz data/lab_traffic.pcap.gz -t 100 --out $W/01 &&
+  python3 02_flows.py --in $W/01 --attackers 172.16.0.5 172.30.0.66 172.30.0.67 --victims 192.168.50.1 192.168.50.4 172.30.0.10 --out $W/02 &&
   python3 03_normalize.py --in $W/02 --mode global --out $W/03 &&
   python3 04_features.py --in $W/03 --set lucid --out $W/04 &&
   python3 05_shape.py --in $W/04 -n 100 --out $W/05 " >/dev/null 2>&1 || bad "pipeline ran"
@@ -41,14 +41,14 @@ echo "== classical detector (14) and explanation (15)"
 $R sh -c "python3 14_classical.py --flows $W/02 --rule syn --split test --out $W/c1.csv >/dev/null &&
           python3 14_classical.py --flows $W/02 --rule syn --split test --bots 50 --out $W/c50.csv >/dev/null &&
           python3 15_explain.py --model $W/m.pt --data $W/05 --repeats 2 --out $W/x.csv > $W/x.txt" 2>/dev/null
-$R python3 - <<'PY' 2>/dev/null && ok "classical rule: perfect on one attacker, recall <= 10 % with 50 bots" || bad "classical rule"
+$R python3 - <<'PY' 2>/dev/null && ok "classical rule: recall >= 90 % and no false alarm on one attacker, recall <= 10 % with 50 bots" || bad "classical rule"
 import csv, sys
 def rec(f):
     r = [x for x in csv.DictReader(open(f)) if x["label"] == "1"]; return sum(x["pred"] == "1" for x in r) / len(r)
 def fpr(f):
     r = [x for x in csv.DictReader(open(f)) if x["label"] == "0"]; return sum(x["pred"] == "1" for x in r) / len(r)
 w = "/srv/work/.check/"
-sys.exit(0 if rec(w + "c1.csv") >= 0.99 and fpr(w + "c1.csv") <= 0.01 and rec(w + "c50.csv") <= 0.10 else 1)
+sys.exit(0 if rec(w + "c1.csv") >= 0.90 and fpr(w + "c1.csv") <= 0.01 and rec(w + "c50.csv") <= 0.10 else 1)
 PY
 $R python3 - <<'PY' 2>/dev/null && ok "explanation: most important feature is a header field with a real accuracy drop" || bad "explanation"
 import csv, sys

@@ -11,7 +11,7 @@
 # iptables INPUT chain inside its container.
 #   usage: postlab_live.sh [model]      (exit code 0 = all checks passed)
 set -u
-MODEL=${1:-models/global_lucid.pt}
+MODEL=${1:-models/global.pt}
 D="docker --context default"
 SRV=$(cd "$(dirname "$0")/../lucid-ddos/server" && pwd)
 DATA="-v $SRV/home_tar/data:/srv/data:ro"                      # Labtainer keeps the capture in home_tar/

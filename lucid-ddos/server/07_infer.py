@@ -24,6 +24,8 @@ def main():
     a.add_argument("--data", required=True, help="output folder of 05_shape.py")
     a.add_argument("--split", choices=["train", "val", "test", "test_newaddr"], default="test",
                    help="test_newaddr: test flows with attacker/client addresses swapped (05_shape.py)")
+    a.add_argument("--source", choices=["all", "cic", "lab"], default="all",
+                   help="classify only the samples of this network (cic = CIC-DDoS2019 sample, lab = lab network)")
     a.add_argument("--threshold", type=float, default=0.5)
     a.add_argument("--out", required=True)
     args = a.parse_args()
@@ -34,11 +36,15 @@ def main():
     pipe = ck["pipeline"]
     d = lablib.load_npz(os.path.join(args.data, f"{args.split}.npz"))
     data_pipe = lablib.load_pipeline(args.data)
-    differ = [k for k in ("window_s", "flows_id", "norm_mode", "features", "n_packets")
+    differ = [k for k in ("window_s", "flows_id", "norm_mode", "fit_on", "features", "n_packets")
               if k in pipe and k in data_pipe and pipe[k] != data_pipe[k]]
     if differ:
         raise SystemExit(f"the model was trained on data prepared differently ({', '.join(differ)}): "
                          + "; ".join(f"{k}: model {pipe[k]} / data {data_pipe[k]}" for k in differ))
+    keep = np.ones(len(d["y"]), bool) if args.source == "all" else d["source"] == args.source
+    if not keep.any():
+        raise SystemExit(f"no {args.split} samples of the {args.source} network")
+    d = {k: d[k][keep] for k in ("X", "y", "sample")}
     X = torch.from_numpy(d["X"])
     if X.shape[2] != pipe["n_features"] or X.shape[1] != pipe["n_packets"]:
         raise SystemExit(f"data shape {tuple(X.shape[1:])} does not match the model "
@@ -57,6 +63,10 @@ def main():
         w.writerow(["sample", "label", "prob_ddos", "pred"])
         for s, yv, pv in zip(d["sample"], d["y"], prob):
             w.writerow([int(s), int(yv), f"{pv:.6f}", int(pv >= args.threshold)])
+    trained_on = pipe["train"].get("train_on", "all")
+    if args.source != "all" or trained_on != "all":
+        print(f"model trained on {lablib.SOURCES.get(trained_on, 'both networks')}, "
+              f"tested on {lablib.SOURCES.get(args.source, 'both networks')}")
     print(f"{len(prob)} {args.split} samples classified in {1000 * dt:.1f} ms "
           f"({1e6 * dt / max(len(prob), 1):.0f} us/sample) -> {args.out}")
 
