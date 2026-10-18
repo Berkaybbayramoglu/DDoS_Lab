@@ -240,8 +240,8 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
 - Time: one training (36,858 samples, 10 epochs) about 1 min, about 500 MB; `01_window` about 1 min,
   about 700 MB (tshark resets its state every 200,000 packets; otherwise it used 2 GB). The whole
   lab part (23 evaluated runs) takes about 11 min of machine time on 1 CPU, the post-lab about 3 min.
-- Post-lab (run twice in a row in Labtainer): replay of about 3,500 validation flows (one sample per
-  flow; 45 + 46 + 241 duplicate samples left out) in about 70 s; both attackers blocked a few seconds
+- Post-lab (run twice in a row in Labtainer): replay of 3,348 validation flows of the lab network (one sample per
+  flow; 33 + 48 + 246 duplicate samples left out) in about 70 s; both attackers blocked 5 seconds
   after the first attack flow, the benign client not blocked. Recall 100 %, FPR 0 %; no flow of the
   SSH channel in the detection log; the second run removed the blocks of the first one.
 
