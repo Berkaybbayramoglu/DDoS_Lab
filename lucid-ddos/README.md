@@ -17,10 +17,10 @@ To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` an
 | --- | --- |
 | `config/start.config` | Network `LAB_LAN` 172.30.0.0/24; `server` .10 (2 CPUs, 2 terminals, X11), `attacker1` .66, `attacker2` .67, `client` .20 (1 CPU each, no terminal). All with `NO_GW` and `ADD-HOST LAB_LAN` |
 | `dockerfiles/` | Based on `labtainer.network3` (Ubuntu 24.04, Python 3.12). Server: tshark, iptables, feh, PyTorch 2.6.0 CPU, numpy 1.26.4, matplotlib 3.11.2, `PYTHONHASHSEED=42`. Traffic containers: tcpreplay, hping3, curl |
-| `server/` | Scripts copied into the student's home directory (01–13, `check.py`, `lablib.py`) |
+| `server/` | Scripts copied into the student's home directory (01–15, `check.py`, `lablib.py`) |
 | `server/home_tar/data/` | The lab dataset: `cic_ddos2019_sample.pcap.gz` (the CIC-DDoS2019 sample of the LUCID authors, 7 MB) and `lab_traffic.pcap.gz` (recorded on the lab network, 44 MB compressed, 947 MB uncompressed), with `README.txt` (source, citation) and `LICENSE-lucid-ddos.txt`. tshark reads the files directly. Kept in `home_tar/` so they are not collected as a student artifact |
 | `instr_config/` | Automatic assessment (`checkwork`) |
-| `docs/` | Student manual (to be written) |
+| `docs/` | Student manual `lucid-ddos.pdf` (built from the LaTeX source of the manual) and `read_first.txt`, which Labtainer shows when the lab starts, with a link to the manual |
 
 After every evaluation, `08_evaluate.py` prints the expected result of the run, whether the run matches it (or which
 parameter to check) and the progress over the 23 runs of the lab sheet; `15_explain.py` and
@@ -270,11 +270,12 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
   writes (no comments, labedit's field order), so saving in labedit produces no diff.
 - **Rule:** values in `results.config` must not contain `:` – labedit splits fields on it.
 - `config/about.txt` and `config/keywords.txt` are the lab description and keywords labedit asks
-  for. The lab manual (`docs/lucid-ddos.pdf`) will be added with the student document.
+  for. The lab manual is `docs/lucid-ddos.pdf`; the imodule ships it with the lab.
 
 ## Developer checks and CI (plain Docker, see `../tools/` and `../.github/workflows/ci.yml`)
 
-- `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset.
+- `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset,
+  the student manual in `docs/`.
 - `lab_sheet.sh`: runs every command of the lab sheet on 1 CPU and requires all 23 runs to match
   the reference results (`check.py --stage results`), so CI shows whether another computer gets the
   same results (about 12 minutes).

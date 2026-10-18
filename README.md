@@ -6,9 +6,22 @@ Attack Detection", IEEE TNSM 2020), step by step, on one CPU.
 
 Students go through the detection pipeline one script at a time – time windows, bidirectional flows,
 normalization, feature selection, shaping, training, inference and evaluation – and compare the
-results of their choices in figures with 95 % confidence intervals. In the post-lab, their own model
-watches a server live while two attackers and a benign client replay held-out traffic; it detects
-and blocks the attackers, and the student writes a post-incident report.
+results of their choices in figures with 95 % confidence intervals. Six experiments compare the
+normalization (none, theoretical as in the paper, global, batchnorm), the feature set (shortcut
+learning on IP addresses), the number of packets per sample, a classical threshold detector, an
+explanation of the model's decisions (permutation importance) and training on another network.
+In the post-lab, their own model watches a server live while two attackers and a benign client
+replay held-out traffic; it detects and blocks the attackers, and the student writes a
+post-incident report.
+
+The dataset is the CIC-DDoS2019 sample that the LUCID authors publish with their code
+([doriguzzi/lucid-ddos](https://github.com/doriguzzi/lucid-ddos), Apache-2.0; Sharafaldin et al.,
+ICCST 2019) together with a recording of the lab network (benign users, SYN and HTTP floods), the
+network the post-lab defends. Source, citation and licence: `lucid-ddos/server/home_tar/data/README.txt`.
+
+The student manual is [`lucid-ddos/docs/lucid-ddos.pdf`](lucid-ddos/docs/lucid-ddos.pdf): theory,
+setup, every command with its expected output, the experiments, the post-lab and the
+post-incident report. Labtainer links to it when the lab starts.
 
 ## Repository layout
 
@@ -49,18 +62,20 @@ cd $LABTAINER_DIR/scripts/labtainer-student && rebuild lucid-ddos
 tools/static_checks.py         # syntax, secrets, English only, Labtainer layout, labedit rules, dataset
 tools/build_images.sh          # developer images lucid-server, lucid-attacker, lucid-ethtool
 tools/check_lab.sh             # whole pipeline on 1 CPU: stage checks, determinism, normalization, classical, explanation
+tools/lab_sheet.sh             # every command of the manual on 1 CPU; all 23 runs must match the reference results
 tools/train_default_model.sh   # model for the post-lab test
 tools/postlab_live.sh          # post-lab: detection, blocking and report checks
 tools/build_labtainer_images.sh   # the four Labtainer images, built as Labtainer builds them
 tools/smoke_labtainer_images.sh   # checks their contents
 tools/publish_images.sh <user>    # pushes them to Docker Hub (CI does this on main)
-tools/build_lab_dataset.sh     # re-records the six sessions (about 20 minutes)
+tools/build_lab_dataset.sh     # downloads the CIC-DDoS2019 sample, re-records the lab network (about 20 minutes)
 ```
 
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every push and pull request: static checks, the lab pipeline,
-the post-lab, and the Labtainer image build with content checks. On `main`, once everything passed,
+the whole lab sheet against the reference results (and the CPU it ran on), the post-lab, and the
+Labtainer image build with content checks. On `main`, once everything passed,
 it publishes the images to Docker Hub:
 
 | Image | Used by |

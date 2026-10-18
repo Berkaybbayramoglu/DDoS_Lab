@@ -9,6 +9,7 @@
   labedit      results.config values contain no ':' (labedit splits fields on it), goals refer to
                existing results
   dataset      the lab dataset is a valid gzip file below GitHub's 100 MB limit
+  manual       the student manual the lab links to (docs/read_first.txt) is a PDF in docs/
 """
 import glob
 import gzip
@@ -47,7 +48,7 @@ for f in files("*.py"):
 check("python files compile", not bad, "; ".join(bad))
 
 # secrets
-text_files = [f for f in files("*") if os.path.isfile(f) and not f.endswith((".gz", ".pcap", ".png"))]
+text_files = [f for f in files("*") if os.path.isfile(f) and not f.endswith((".gz", ".pcap", ".png", ".pdf"))]
 secret = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{20,}|dckr_pat_[A-Za-z0-9_-]{10,}")
 bad = [f for f in text_files if secret.search(open(f, errors="ignore").read())]
 check("no private keys or tokens", not bad, ", ".join(bad))
@@ -96,6 +97,13 @@ for name in ("lab_traffic.pcap.gz", "cic_ddos2019_sample.pcap.gz"):
     check(f"dataset {name} below 100 MB", os.path.isfile(pcap) and os.path.getsize(pcap) < 100 * 2**20)
 check("dataset source and licence documented",
       all(os.path.isfile(os.path.join(LAB, "server", "home_tar", "data", f)) for f in ("README.txt", "LICENSE-lucid-ddos.txt")))
+
+manual = os.path.join(LAB, "docs", "lucid-ddos.pdf")
+with open(os.path.join(LAB, "docs", "read_first.txt")) as fh:
+    linked = "LAB_DOCS/lucid-ddos.pdf" in fh.read()
+with open(manual, "rb") if os.path.isfile(manual) else open(os.devnull, "rb") as fh:
+    is_pdf = fh.read(5) == b"%PDF-"
+check("student manual docs/lucid-ddos.pdf present and linked from read_first.txt", linked and is_pdf)
 
 print(f"\n{len(failures)} check(s) failed" if failures else "\nall checks passed")
 sys.exit(1 if failures else 0)
