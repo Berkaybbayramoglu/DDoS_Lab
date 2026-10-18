@@ -73,8 +73,12 @@ loss = {m: float(json.load(open(f"/srv/work/.check/m_{m}_train_log.json"))["epoc
 acc = {x["name"]: x["point"]["accuracy"] for x in json.load(open("/srv/work/.check/reg/registry.json"))}
 sys.exit(0 if loss["none"] > loss["theoretical"] > loss["global"] and acc["global"] >= 0.99 else 1)
 PY
-if [ "$($R python3 check.py --stage results --dir $W/reg 2>/dev/null | grep -c '^| normalization .*matches the reference')" = 4 ]; then
-  ok "reference results: the 4 normalization runs match check.py --stage results"; else bad "reference results (check.py --stage results)"; fi
+RES=$($R python3 check.py --stage results --dir $W/reg 2>/dev/null)
+if [ "$(echo "$RES" | grep -c '^| normalization .*matches the reference')" = 4 ]; then
+  ok "reference results: the 4 normalization runs match check.py --stage results"
+else
+  bad "reference results (check.py --stage results)"; echo "$RES" | grep '^| normalization'
+fi
 
 echo "== Summary: $PASS passed, $FAIL failed"
 rm -rf "$SRV/work/.check"
