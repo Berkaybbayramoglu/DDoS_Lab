@@ -291,6 +291,25 @@ Labtainer's report shows only `Y`/`N` and whole numbers, so the times are collec
 `results/time_result.json` and the quiz answers of every submitted archive and writes one row per
 student (start, end, minutes per checkpoint, attempts, quiz scores, training and inference time).
 
+`results/time_result.json` lies in the student's home directory and could be edited. `time_report.py`
+therefore cross-checks it (`../tools/capture_check.py`) against what Labtainer records by itself: every
+command typed in a lab terminal is captured in `.local/result/<program>.stdout.<start time>` with its
+command line, its screen output and its end time, and `.local/.seed` is created when the lab is opened.
+The columns `verified` (`yes` / `NO`) and `issues` show the result:
+
+| Checked | Against the capture |
+| --- | --- |
+| `lab_start` | the creation of `.local/.seed` (within 2 minutes), not after the first command |
+| every passed checkpoint | the end of a captured run of the script that passes it, with its success line on the screen (e.g. `window stage - 100 % of the rules pass`, `your run: OK`); its minutes |
+| every training / inference run | one captured run of the same script that it starts just after and ends just before; its seconds; no completed captured run missing from the record |
+| `lab_finish`, `lab_minutes` | the first completed `11_incident_report.py` run |
+| quizzes | the graded first attempt has the score that the first completed quiz run showed on the screen; the number of attempts |
+
+`lab_start_capture`, `lab_finish_capture` and `lab_minutes_capture` give the times from the capture
+alone. A command not typed in a lab terminal (e.g. run from a script file) is not captured, so it is
+reported as "not found in Labtainer's capture": a reason to look, not proof of editing. The capture
+files are in the student's home directory too, so this makes editing much harder, not impossible.
+
 The quizzes are also Labtainer quizzes: `quiz -l lucid-ddos -q prelab` on the VM asks the same questions
 as a self-check, without saving the answers. To change a quiz, edit `config/<quiz>.quiz` and copy it to
 `server/quiz/` (the static checks require both to be identical); only `TrueFalse` and `Preface` entries
@@ -313,6 +332,8 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
 
 - `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, the
   assessment (checkpoints, prestop, quizzes), dataset, the student manual in `docs/`.
+- `test_capture_check.py`: the cross-check of the progress record on a synthetic submission: an
+  unchanged one passes, every kind of edit (times, runs, quiz answers, deleted files) is found.
 - `lab_sheet.sh`: runs every command of the lab sheet on 1 CPU and requires all 23 runs to match
   the reference results (`check.py --stage results`), so CI shows whether another computer gets the
   same results (about 12 minutes). It also takes the pre-lab quiz and checks the progress record: every

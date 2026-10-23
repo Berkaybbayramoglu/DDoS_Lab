@@ -1,6 +1,7 @@
 name: CI
 
-# static          fast repository checks (syntax, secrets, English, Labtainer layout, labedit rules)
+# static          fast repository checks (syntax, secrets, English, Labtainer layout, labedit rules) and
+#                 the tests of the progress-record cross-check (tools/test_capture_check.py)
 # pipeline        the whole lab pipeline on 1 CPU: stage checks, determinism, normalization ordering
 # labsheet        every command of the lab sheet; all 23 runs must match the reference results
 # postlab         live detection + blocking against the replayed validation traffic, report checks
@@ -25,6 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tools/static_checks.py
+      - run: python3 tools/test_capture_check.py     # the cross-check of the progress record
 
   pipeline:
     needs: static
