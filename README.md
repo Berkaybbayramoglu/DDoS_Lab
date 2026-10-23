@@ -30,6 +30,16 @@ post-incident report. Labtainer links to it when the lab starts.
 | `lucid-ddos/` | The Labtainer lab (config, Dockerfiles, container home directories, assessment). See [`lucid-ddos/README.md`](lucid-ddos/README.md) |
 | `tools/` | Developer tools (plain Docker): dataset recording, end-to-end checks, copying the lab into a Labtainer VM |
 
+## Requirements
+
+| | Minimum | Tested with |
+| --- | --- | --- |
+| Processor | 64-bit x86 (Intel or AMD) with VT-x / AMD-V enabled; ARM computers (e.g. Apple M-series) cannot run the Labtainer VM directly | Intel Core i9-14900HX |
+| VM | 2 cores, 4 GB RAM (the computer: 8 GB RAM) | whole lab: 4 cores, 4.7 GB; heaviest parts: 2 cores, 4 GB (peak 2.1 GB used) |
+| Disk | 40 GB free: the Labtainer VM (6.3 GB download, about 30 GB in use) and this lab (about 3.5 GB) | |
+| Network | once, to download the VM and the lab images (about 1 GB); the lab itself runs offline | |
+| Software | VirtualBox (or VMware) with the [Labtainer VM](https://nps.edu/web/c3o/virtual-machine-images) | VirtualBox 7.2, Labtainer VM 24 |
+
 ## Using the lab
 
 Students, in the `labtainer-student` terminal of a Labtainer VM:
