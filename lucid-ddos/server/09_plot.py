@@ -18,6 +18,7 @@ import json
 import os
 
 import lablib
+import progress
 
 SHOW = [("accuracy", "accuracy"), ("f1", "F1"), ("fpr", "false-positive rate")]
 
@@ -121,6 +122,8 @@ def main():
         print(f"Figure {k} / Table {k}: {g}")
         lablib.print_table(cells, ["run", "metric", "mean %", "median %", "95 % CI %"])
         print(f"-> {path}")
+        if g in progress.GROUP_CHECKPOINT:
+            progress.checkpoint("figures", None, part=(g, True), parts=list(progress.GROUP_CHECKPOINT))
 
 
 if __name__ == "__main__":

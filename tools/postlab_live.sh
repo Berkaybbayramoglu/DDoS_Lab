@@ -4,7 +4,9 @@
 #   attacker1/2 replay their share of the held-out validation traffic (12_build_replay.py output)
 #   a benign client replays the validation benign traffic at the same time
 # After the replay the server writes the post-incident report (11_incident_report.py) and the result
-# is checked: both attackers blocked, the client not blocked, recall >= 90 %, FPR <= 5 %.
+# is checked: both attackers blocked, the client not blocked, recall >= 90 %, FPR <= 5 %; and the
+# progress record: the live detection timed, the incident checkpoint passed and the end of the lab set
+# by the report (the last script), and the post-lab quiz graded.
 # The traffic containers start replay_attack.sh directly; the SSH hand-over of 13_launch_replay.sh
 # (student's own key) is exercised in Labtainer, not here.
 # Everything runs on an isolated Docker bridge; the only state changed is the server's own
@@ -57,6 +59,8 @@ $D run --rm -v "$SRV":/srv lucid-server chown -R "$(id -u):$(id -g)" /srv/result
 $D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v "$SRV":/srv $DATA -w /srv lucid-server \
    python3 11_incident_report.py --log results/incident_live.csv --victim $VIC --attackers $A1 $A2 \
    --out results/incident_report.txt
+$D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v "$SRV":/srv -w /srv -i lucid-server \
+   sh -c "printf 'T\nF\nT\nF\nT\nF\nT\nF\n' | python3 quiz.py postlab" | tail -2
 $D logs pl-server 2>/dev/null | tail -0
 $D rm -f pl-server pl-att1 pl-att2 pl-client >/dev/null 2>&1; $D network rm plnet >/dev/null
 echo "done -> server/results/incident_live.csv, server/results/incident_report.txt"
@@ -71,6 +75,14 @@ checks = [("attacker1 blocked", sys.argv[2] in blocked), ("attacker2 blocked", s
           ("client not blocked", sys.argv[4] not in blocked), (f"recall {recall} % >= 90 %", recall >= 90),
           (f"FPR {fpr} % <= 5 %", fpr <= 5)]
 for name, ok in checks:
+    print(("PASS  " if ok else "FAIL  ") + name)
+rec = __import__("json").load(open(sys.argv[1].replace("incident_report.txt", "time_result.json")))
+cp = rec["checkpoints"]
+checks += [("live detection timed", any(r["script"] == "10_detect_block.py" for r in rec.get("inference", []))),
+           ("incident checkpoint passed", "passed" in cp.get("incident", {})),
+           ("end of the lab set by the report", "lab_finish" in rec),
+           ("post-lab quiz graded 8 of 8", open(sys.argv[1].replace("incident_report.txt", "quiz_postlab.txt")).read().count("- RIGHT") == 8)]
+for name, ok in checks[-4:]:
     print(("PASS  " if ok else "FAIL  ") + name)
 sys.exit(0 if all(ok for _, ok in checks) else 1)
 PY

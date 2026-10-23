@@ -1,0 +1,34 @@
+#
+# lucid-ddos post-lab quiz (Labtainer quiz format, True/False questions; see the Labtainer lab designer
+# guide, section 7). Take it after the post-incident report:
+#   on the Labtainer VM:        quiz -l lucid-ddos -q postlab    (self-check, answers are not saved)
+#   in the server terminal:     python3 quiz.py postlab          (answers go to the instructor)
+# server/quiz/postlab.quiz must stay identical to this file (tools/static_checks.py checks it).
+#
+0, Preface,
+"Post-lab quiz: what the experiments and the live incident showed. Answer T (true) or F (false) \
+from your own results."
+1, TrueFalse, "Without normalization, features with large raw values such as the TCP acknowledgement number can dominate the training.", T,
+"Raw header values live on very different scales (feature dominance), which makes training unstable.",
+"Raw header values live on very different scales; the large ones dominate the gradients (feature dominance), as Experiment 1 shows."
+2, TrueFalse, "In Experiment 2 the model with the IP addresses (lucid_ids) kept its accuracy when the attacker and client addresses were swapped.", F,
+"Its accuracy fell to about 40 %: it had memorised the addresses.",
+"On test_newaddr its accuracy fell to about 40 %: the model had learned the addresses (shortcut learning), not the traffic."
+3, TrueFalse, "In Experiment 3, keeping only n = 3 packets per flow gave a lower accuracy than n = 100.", T,
+"About 79 % instead of almost 100 %: three packets cut away the part of the flow that shows the attack.",
+"With n = 3 the accuracy was about 79 % against almost 100 % for n = 100: too few packets cut away the part of the flow that shows the attack."
+4, TrueFalse, "In Experiment 4 the SYN threshold flagged almost every flow of the distributed attack (50 bots).", F,
+"It flagged nothing: every bot stayed under the per-source threshold.",
+"Its accuracy of about 50 % means it flagged nothing: every bot stayed under the per-source threshold."
+5, TrueFalse, "Permutation importance measures how much the accuracy drops when the values of one feature are shuffled.", T,
+"A feature whose shuffling hurts the accuracy is one the model relies on.",
+"Permutation importance shuffles one feature at a time and measures the drop in accuracy (Experiment 5)."
+6, TrueFalse, "A model trained only on the CIC-DDoS2019 sample also detects the attacks of the lab network reliably.", F,
+"On the lab network it caught almost none of the attacks: a model must be validated on the network it protects.",
+"On the lab network its accuracy was about 43 % and it caught almost none of the attacks (Experiment 6): a model must be validated on the network it protects."
+7, TrueFalse, "Two runs whose 95 % confidence intervals overlap cannot be called different with confidence.", T,
+"Overlapping intervals mean the difference may be due to the particular test samples.",
+"When the intervals overlap, the difference between the two runs may come from the particular test samples, so it cannot be claimed with confidence."
+8, TrueFalse, "In the live test the legitimate client had to be blocked as well to stop the attack.", F,
+"Only the two attacker addresses were blocked; the client kept its access.",
+"Only the two attacker addresses were blocked with iptables DROP rules; the legitimate client kept its access, which is what a good detector should achieve."

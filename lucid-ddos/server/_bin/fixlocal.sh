@@ -16,3 +16,7 @@
 #   PERMLOCKDIR=/var/labtainer/did_param
 #   echo $1 | sudo -S mkdir -p "$PERMLOCKDIR"
 
+
+# The lab is opened for the first time (Labtainer runs this script once, when it creates the server
+# container): record the start time of the lab in results/time_result.json (progress.py).
+python3 "$HOME/progress.py" --start

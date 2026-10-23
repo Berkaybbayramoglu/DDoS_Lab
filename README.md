@@ -48,6 +48,15 @@ for c in server attacker1 attacker2 client; do docker pull berkaybbayramoglu/luc
 labtainer -r lucid-ddos        # -r: start from fresh containers
 ```
 
+Instructors put the submitted archives (`<student>.lucid-ddos.lab`) in `~/labtainer_xfer/lucid-ddos` and run,
+in the `labtainer-instructor` terminal:
+
+```bash
+gradelab lucid-ddos            # one Y/N column per checkpoint of the lab, and the quiz scores
+python3 tools/time_report.py ~/labtainer_xfer/lucid-ddos --out times.csv --runs runs.csv
+                               # start and end of the lab, minutes to every checkpoint, training/inference time
+```
+
 Lab developers, to work on the lab in a Labtainer VM:
 
 ```bash
@@ -68,6 +77,7 @@ tools/postlab_live.sh          # post-lab: detection, blocking and report checks
 tools/build_labtainer_images.sh   # the four Labtainer images, built as Labtainer builds them
 tools/smoke_labtainer_images.sh   # checks their contents
 tools/publish_images.sh <user>    # pushes them to Docker Hub (CI does this on main)
+tools/time_report.py <folder>     # instructor: times, checkpoints and quiz scores of all submissions -> CSV
 tools/build_lab_dataset.sh     # downloads the CIC-DDoS2019 sample, re-records the lab network (about 20 minutes)
 ```
 

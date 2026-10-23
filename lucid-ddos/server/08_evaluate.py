@@ -21,6 +21,7 @@ import os
 import numpy as np
 
 import lablib
+import progress
 
 METRICS = ["accuracy", "precision", "recall", "f1", "fpr"]
 
@@ -103,6 +104,13 @@ def main():
     done = sum(1 for r in reg if (r["group"], r["name"]) in check.REFERENCE and check.compare_run(r)[0])
     total = len(check.REFERENCE)
     print(f"progress: {done} of {total} runs of the lab sheet match the reference ({100 * done / total:.0f} %)")
+    if (args.group, args.name) == ("normalization", "global"):
+        progress.checkpoint("baseline", check.compare_run(entry)[0])
+    group_runs = [k for k in check.REFERENCE if k[0] == args.group]
+    if (args.group, args.name) in check.REFERENCE and args.group in progress.GROUP_CHECKPOINT:
+        ok = sum(1 for r in reg if (r["group"], r["name"]) in group_runs and check.compare_run(r)[0])
+        progress.checkpoint(progress.GROUP_CHECKPOINT[args.group], ok == len(group_runs),
+                            score=int(round(100 * ok / len(group_runs))))
 
 
 if __name__ == "__main__":

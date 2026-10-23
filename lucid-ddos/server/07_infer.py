@@ -16,6 +16,7 @@ import time
 import numpy as np
 
 import lablib
+import progress
 
 
 def main():
@@ -29,6 +30,7 @@ def main():
     a.add_argument("--threshold", type=float, default=0.5)
     a.add_argument("--out", required=True)
     args = a.parse_args()
+    t_start = progress.now()
     lablib.set_seed()
     import torch
 
@@ -63,6 +65,8 @@ def main():
         w.writerow(["sample", "label", "prob_ddos", "pred"])
         for s, yv, pv in zip(d["sample"], d["y"], prob):
             w.writerow([int(s), int(yv), f"{pv:.6f}", int(pv >= args.threshold)])
+    progress.run("inference", "07_infer.py", t_start, model=args.model, data=args.data, split=args.split,
+                 source=args.source, samples=len(prob))
     trained_on = pipe["train"].get("train_on", "all")
     if args.source != "all" or trained_on != "all":
         print(f"model trained on {lablib.SOURCES.get(trained_on, 'both networks')}, "

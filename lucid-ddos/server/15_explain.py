@@ -23,6 +23,7 @@ import os
 import numpy as np
 
 import lablib
+import progress
 
 
 # expected most important feature (and its accuracy drop in points) for the models of the lab sheet,
@@ -142,6 +143,8 @@ def main():
         ok = rows[0][0] == name and abs(100 * rows[0][1] - drop) <= 1.0
         print(f"expected result: most important feature {name} (accuracy drop {drop:.1f} pp); yours: "
               f"{rows[0][0]} ({100 * rows[0][1]:.1f} pp) -> {'OK - matches the reference' if ok else 'CHECK - differs: check the --model and --data of this run'}")
+        progress.checkpoint("exp5_explain", None, part=(f"{tag}/{args.source}", ok),
+                            parts=[f"{t}/{s}" for t, s in EXPECTED])
     print(f"-> {out}, {plot}")
 
 

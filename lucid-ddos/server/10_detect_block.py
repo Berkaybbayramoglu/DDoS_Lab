@@ -35,6 +35,7 @@ import time
 import numpy as np
 
 import lablib
+import progress
 
 
 def block_ip(ip):
@@ -94,6 +95,7 @@ def main():
                    help="live: a flow is judged before its window closes only after N s without packets")
     a.add_argument("--out", required=True)
     args = a.parse_args()
+    t_start = progress.now()
     if args.pcap and args.block:
         a.error("--block only applies to live capture (--iface); a pcap is analysed offline")
     if args.iface and os.geteuid() != 0:
@@ -214,6 +216,8 @@ def main():
         proc.terminate()
 
     fh.close()
+    progress.run("inference", "10_detect_block.py", t_start, model=args.model, live=not args.pcap,
+                 flows=n_flows, blocked=len(blocked) if args.block else 0)
     print(f"\n{n_flows} flows seen, {n_attack} classified as DDoS, {len(blocked)} distinct attacker IP(s) "
           f"{'blocked' if args.block else 'identified'}")
     print(f"-> {args.out}")

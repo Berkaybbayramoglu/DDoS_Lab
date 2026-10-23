@@ -17,9 +17,11 @@ To work on the lab, copy it into a Labtainer VM with `../tools/push_to_vm.sh` an
 | --- | --- |
 | `config/start.config` | Network `LAB_LAN` 172.30.0.0/24; `server` .10 (2 CPUs, 2 terminals, X11), `attacker1` .66, `attacker2` .67, `client` .20 (1 CPU each, no terminal). All with `NO_GW` and `ADD-HOST LAB_LAN` |
 | `dockerfiles/` | Based on `labtainer.network3` (Ubuntu 24.04, Python 3.12). Server: tshark, iptables, feh, PyTorch 2.6.0 CPU, numpy 1.26.4, matplotlib 3.11.2, `PYTHONHASHSEED=42`. Traffic containers: tcpreplay, hping3, curl |
-| `server/` | Scripts copied into the student's home directory (01–15, `check.py`, `lablib.py`) |
+| `server/` | Scripts copied into the student's home directory (01–15, `check.py`, `lablib.py`, `progress.py`, `quiz.py` with `quiz/`) |
+| `server/_bin/` | `fixlocal.sh` (runs once when the lab is opened: records the start time), `prestop` (runs on `checkwork` and `stoplab`: the progress table) |
 | `server/home_tar/data/` | The lab dataset: `cic_ddos2019_sample.pcap.gz` (the CIC-DDoS2019 sample of the LUCID authors, 7 MB) and `lab_traffic.pcap.gz` (recorded on the lab network, 44 MB compressed, 947 MB uncompressed), with `README.txt` (source, citation) and `LICENSE-lucid-ddos.txt`. tshark reads the files directly. Kept in `home_tar/` so they are not collected as a student artifact |
-| `instr_config/` | Automatic assessment (`checkwork`) |
+| `instr_config/` | Automatic assessment (`gradelab` for the instructor, `checkwork` for the student) |
+| `config/prelab.quiz`, `config/postlab.quiz` | The pre-lab and post-lab quizzes (Labtainer quiz format; `server/quiz/` holds identical copies) |
 | `docs/` | Student manual `lucid-ddos.pdf` (built from the LaTeX source of the manual) and `read_first.txt`, which Labtainer shows when the lab starts, with a link to the manual |
 
 After every evaluation, `08_evaluate.py` prints the expected result of the run, whether the run matches it (or which
@@ -46,6 +48,8 @@ a model prepared differently from the data (window, flows, normalization, featur
 | 14 | `14_classical.py` | Classical detection: a per-source threshold (SYN or packets per second in a window), tuned on the training split; `--bots K` spreads the attack over K bot addresses | `results/classical_*.csv` (+ `.sweep.json`) |
 | 15 | `15_explain.py` | What the model relies on (permutation importance) and where it fails (errors by flow length) | `results/explain_*.csv`, `results/plots/explain_*.png` |
 | – | `check.py` | Checks the rules of every preprocessing step independently; `--stage results` compares every run of the lab sheet with the reference results (settings and metrics) | table on screen |
+| – | `progress.py` | The checkpoints of the lab: passed or not, when, how many attempts, and the next one to do | `results/time_result.json` |
+| – | `quiz.py prelab` / `quiz.py postlab` | Pre-lab and post-lab quiz (True/False); the first attempt is graded | `results/quiz_*.txt`, `results/quiz_*.json` |
 
 ```bash
 python3 01_window.py --pcap data/cic_ddos2019_sample.pcap.gz data/lab_traffic.pcap.gz -t 100 --out work/01_window
@@ -250,9 +254,16 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
 
 ## Assessment (`instr_config/`)
 
+`gradelab lucid-ddos` (instructor) and `checkwork lucid-ddos` (student) show one line per checkpoint of
+the lab sheet: `Y` = passed. `checkwork` also says, when not every checkpoint is passed yet, to run
+`python3 progress.py`, which lists the checkpoints with their state and the command for the next one.
+
 | Goal | Source |
 | --- | --- |
+| `prelab_quiz`, `postlab_quiz` | Correct answers in the first attempt of `quiz.py prelab` (10 questions) / `quiz.py postlab` (8) |
 | `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass`" |
+| `baseline_match` | Steps 6–8: the run `global` matches the reference |
+| `exp1_match` … `exp6_match` | Every run of the experiment matches the reference (Experiment 5: the three explanations) |
 | `results_check` | `check.py --stage results`: all 23 runs of the lab sheet match the reference |
 | `normalization_compared`, `features_compared`, `shape_compared` | `09_plot.py` stdout (one figure per experiment) |
 | `address_swap_tested` | `07_infer.py` was run on the `test_newaddr` split |
@@ -261,6 +272,29 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
 | `network_shift_tested`, `shift_compared` | `07_infer.py` tested a model trained on the CIC sample on the lab network; `09_plot.py` drew the shift figure |
 | `incident_report`, `attacker1_blocked`, `attacker2_blocked` | `results/incident_report.txt` |
 | `only_attackers_blocked` | Both attackers listed and exactly 2 addresses blocked (the client was not) |
+| `incident_match` | Every expected result of the live test: both attackers blocked, the client not, recall 100 %, no false positives |
+| `lab_finished` | The last script of the lab, `11_incident_report.py`, completed |
+| `cw_all_passed` | `checkwork` only: all checkpoints passed (from the `prestop` output) |
+
+The `*_match`, `incident_match` and `lab_finished` goals read `results/time_result.json`, which the lab
+scripts write through `progress.py`:
+
+| Entry | Written by |
+| --- | --- |
+| `lab_start` | `_bin/fixlocal.sh` (`progress.py --start`), once, when Labtainer creates the server container, i.e. when the student first opens the lab |
+| `lab_finish`, `lab_minutes` | The first completion of `11_incident_report.py`, the last script of the lab. The end is triggered by the last script, not by `stoplab`, which may come much later |
+| `checkpoints` | Each checkpoint: the first time it was passed (`passed`, `minutes` after `lab_start`), `attempts` and `last_score`. Written by `check.py`, `08_evaluate.py`, `09_plot.py`, `15_explain.py`, `11_incident_report.py`, `quiz.py` |
+| `training`, `inference` | Start, end and seconds of every `06_train.py` and of every `07_infer.py` / `10_detect_block.py` run, with model and data |
+
+Labtainer's report shows only `Y`/`N` and whole numbers, so the times are collected separately:
+`../tools/time_report.py <folder with the submissions> --out times.csv --runs runs.csv` reads
+`results/time_result.json` and the quiz answers of every submitted archive and writes one row per
+student (start, end, minutes per checkpoint, attempts, quiz scores, training and inference time).
+
+The quizzes are also Labtainer quizzes: `quiz -l lucid-ddos -q prelab` on the VM asks the same questions
+as a self-check, without saving the answers. To change a quiz, edit `config/<quiz>.quiz` and copy it to
+`server/quiz/` (the static checks require both to be identical); only `TrueFalse` and `Preface` entries
+exist in Labtainer's quiz format.
 
 ## labedit
 
@@ -277,15 +311,17 @@ The lab opens in labedit (File → Open Lab → `labs/lucid-ddos`):
 
 ## Developer checks and CI (plain Docker, see `../tools/` and `../.github/workflows/ci.yml`)
 
-- `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, dataset,
-  the student manual in `docs/`.
+- `static_checks.py`: syntax, no secrets, no Turkish text, Labtainer layout, labedit rules, the
+  assessment (checkpoints, prestop, quizzes), dataset, the student manual in `docs/`.
 - `lab_sheet.sh`: runs every command of the lab sheet on 1 CPU and requires all 23 runs to match
   the reference results (`check.py --stage results`), so CI shows whether another computer gets the
-  same results (about 12 minutes).
+  same results (about 12 minutes). It also takes the pre-lab quiz and checks the progress record: every
+  checkpoint of the lab sheet passed, every training and inference run timed.
 - `check_lab.sh`: runs the whole pipeline on 1 CPU and checks the stage scores, determinism and the
   normalization ordering, classical rule, explanation and the reference results (11/11, about 9 minutes).
 - `train_default_model.sh` + `postlab_live.sh`: the post-lab with plain Docker containers; checks that
-  both attackers and only they are blocked, recall >= 90 %, FPR <= 5 %. The SSH hand-over of step 0 is
-  exercised in Labtainer, not here.
+  both attackers and only they are blocked, recall >= 90 %, FPR <= 5 %, the live detection timed, the
+  incident checkpoint passed, the end of the lab recorded, and the post-lab quiz graded. The SSH
+  hand-over of step 0 is exercised in Labtainer, not here.
 - `build_labtainer_images.sh` + `smoke_labtainer_images.sh`: builds the four images the way Labtainer
   does and checks their contents; on `main` CI then publishes them with `publish_images.sh`.

@@ -20,6 +20,7 @@ import time
 import numpy as np
 
 import lablib
+import progress
 
 
 def main():
@@ -33,6 +34,7 @@ def main():
     a.add_argument("--lr", type=float, default=0.01)
     a.add_argument("--kernels", type=int, default=64)
     args = a.parse_args()
+    t_start = progress.now()
     lablib.set_seed()
     import torch
     import torch.nn.functional as F
@@ -70,6 +72,9 @@ def main():
     torch.save({"state": model.state_dict(), "pipeline": pipe}, args.model)
     with open(os.path.splitext(args.model)[0] + "_train_log.json", "w") as fh:
         json.dump({"epochs": rows}, fh, indent=1)
+
+    progress.run("training", "06_train.py", t_start, model=args.model, data=args.data, train_on=args.train_on,
+                 epochs=args.epochs, samples=len(X))
 
     shown = rows if len(rows) <= 6 else rows[:3] + [["...", "", "", ""]] + rows[-3:]
     lablib.print_table(shown, ["epoch", "train loss", "train accuracy", "elapsed (s)"])

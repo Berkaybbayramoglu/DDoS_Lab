@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 import numpy as np
 
 import lablib
+import progress
 
 
 def ci(values, fn, n=1000):
@@ -156,6 +157,10 @@ def main():
             print(f"   {'PASS' if ok else 'FAIL'}  {name}")
         n_ok = sum(ok for _, ok in checks)
         print(f"   -> {n_ok} of {len(checks)} expected results reached ({100 * n_ok / len(checks):.0f} %)")
+        progress.checkpoint("incident", n_ok == len(checks), score=int(round(100 * n_ok / len(checks))))
+    # the last script of the lab: its first completion is the end time of the lab (stoplab is not used,
+    # the student may stop the lab much later)
+    progress.lab_finish()
 
 
 if __name__ == "__main__":

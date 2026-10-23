@@ -1,0 +1,5 @@
+#!/bin/bash
+# Run by Labtainer on checkwork and stoplab: the state of the checkpoints at that moment
+# (instr_config/results.config reads the last line for checkwork).
+trap "echo Timed out; exit" SIGTERM
+python3 "$HOME/progress.py"

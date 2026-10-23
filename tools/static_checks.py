@@ -8,6 +8,8 @@
                start.config, Dockerfiles based on a Labtainer image, executable _bin/fixlocal.sh
   labedit      results.config values contain no ':' (labedit splits fields on it), goals refer to
                existing results
+  assessment   the checkpoints read from results/time_result.json exist in progress.py, the prestop
+               script is executable, the quizzes parse and the copy in the server equals config/
   dataset      the lab dataset is a valid gzip file below GitHub's 100 MB limit
   manual       the student manual the lab links to (docs/read_first.txt) is a PDF in docs/
 """
@@ -84,7 +86,25 @@ for g in goals:
     m = re.search(r"\(([^)]*)\)", g)
     if m:
         used |= {x.strip() for x in m.group(1).split(",")}
+    m = re.search(r"=\s*value\s*:\s*(\S+)", g)
+    if m:
+        used.add(m.group(1))
 check("goals refer to existing results", used <= tags, ", ".join(sorted(used - tags)))
+
+# assessment
+sys.path.insert(0, os.path.join(LAB, "server"))
+import progress  # noqa: E402
+import quiz  # noqa: E402
+named = re.findall(r'time_result\.json : FILE_REGEX : "(\w+)"', "".join(results))
+check("results.config reads checkpoints that progress.py writes",
+      named and set(named) <= set(progress.NAMES) | {"lab_finish"}, ", ".join(sorted(set(named) - set(progress.NAMES))))
+check("server/_bin/prestop executable", os.access(os.path.join(LAB, "server", "_bin", "prestop"), os.X_OK))
+for q in ("prelab", "postlab"):
+    cfg, srv = os.path.join(LAB, "config", f"{q}.quiz"), os.path.join(LAB, "server", "quiz", f"{q}.quiz")
+    check(f"quiz {q}: server/quiz copy equals config/", os.path.isfile(srv) and open(cfg).read() == open(srv).read())
+    items = [i for i in quiz.read_quiz(cfg) if i["type"] == "tf"]
+    check(f"quiz {q}: True/False questions with both responses",
+          bool(items) and all(i["answer"] in ("T", "F") and i["right"] and i["wrong"] for i in items))
 
 # dataset
 for name in ("lab_traffic.pcap.gz", "cic_ddos2019_sample.pcap.gz"):

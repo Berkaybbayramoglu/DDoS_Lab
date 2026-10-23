@@ -21,6 +21,7 @@ import os
 import numpy as np
 
 import lablib
+import progress
 
 
 def ratio(ok, total):
@@ -276,6 +277,7 @@ def main():
         score = 100 * ok_count / len(REFERENCE)
         print(f"{ok_count} of {len(REFERENCE)} reference runs match")
         print(f"results stage - {score:.0f} % of the reference runs match")   # graded by Labtainer
+        progress.checkpoint("results", ok_count == len(REFERENCE), score=int(round(score)))
         return
     rules = {"window": check_window, "flows": check_flows, "normalize": check_normalize,
              "features": check_features, "shape": check_shape}[args.stage](args.dir)
@@ -283,6 +285,7 @@ def main():
     lablib.print_table([[name, val, "PASS" if ok else "FAIL"] for name, val, ok in rules], ["rule", "result", ""])
     score = 100 * sum(ok for _, _, ok in scored) / len(scored)
     print(f"{args.stage} stage - {score:.0f} % of the rules pass")     # graded by Labtainer (no colon)
+    progress.checkpoint(args.stage, score == 100, score=int(round(score)))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,9 @@
 #!/bin/bash
 # Runs every command of the lab sheet (the student manual) in order, in the lucid-server developer
 # image on 1 CPU, and checks that all runs match the reference results (check.py --stage results).
-# Shows on another computer whether the results of the lab are the same there.
+# Shows on another computer whether the results of the lab are the same there. Also checks the
+# progress record of the lab (progress.py, results/time_result.json): every checkpoint of the lab sheet
+# passed, every training and inference run timed, and the pre-lab quiz graded.
 #   usage: lab_sheet.sh            (needs the lucid-server image; replaces work/, models/, results/)
 set -u
 SRV=$(cd "$(dirname "$0")/../lucid-ddos/server" && pwd)
@@ -14,6 +16,9 @@ $D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e PYTHONHASHSEED=42 -e HOME=/tmp -e
 set -e
 rm -rf work models results
 L() { echo "### $*"; "$@"; }
+L python3 progress.py --start                        # Labtainer: _bin/fixlocal.sh when the lab is opened
+echo "### python3 quiz.py prelab   (all answers right)"
+printf 'T\nF\nF\nT\nF\nT\nT\nF\nT\nF\n' | python3 quiz.py prelab
 L python3 01_window.py --pcap data/cic_ddos2019_sample.pcap.gz data/lab_traffic.pcap.gz -t 100 --out work/01_window
 L python3 check.py --stage window --dir work/01_window
 L python3 02_flows.py --in work/01_window --attackers 172.16.0.5 172.30.0.66 172.30.0.67 --victims 192.168.50.1 192.168.50.4 172.30.0.10 --out work/02_flows
@@ -77,9 +82,27 @@ for src in cic lab; do
 done
 L python3 09_plot.py --groups normalization features shape classical shift
 L python3 check.py --stage results --dir results
+L python3 progress.py
 SHEET
 status=$?
 mv "$SRV/results_sheet.log" "$SRV/results/lab_sheet.log" 2>/dev/null
 LOG="$SRV/results/lab_sheet.log"
 sed -n '/^### python3 check.py --stage results/,$p' "$LOG"
-[ $status -eq 0 ] && grep -q "results stage - 100 % of the reference runs match" "$LOG"
+[ $status -eq 0 ] && grep -q "results stage - 100 % of the reference runs match" "$LOG" || exit 1
+# the progress record: all checkpoints of the lab sheet (the post-lab ones are tested by postlab_live.sh)
+python3 - "$SRV/results/time_result.json" "$SRV/results/quiz_prelab.txt" "$LOG" <<'PY'
+import json, sys
+rec = json.load(open(sys.argv[1]))
+log = open(sys.argv[3]).read()
+cps = rec["checkpoints"]
+want = ["prelab_quiz", "window", "flows", "normalize", "features", "shape", "baseline", "exp1_normalization",
+        "exp2_features", "exp3_shape", "exp4_classical", "exp5_explain", "exp6_shift", "results", "figures"]
+checks = [(f"checkpoint {c} passed", "passed" in cps.get(c, {}) and "minutes" in cps[c]) for c in want]
+checks += [("training runs timed (one per 06_train.py)", rec["training_runs"] == log.count("### python3 06_train.py")),
+           ("inference runs timed (one per 07_infer.py)", rec["inference_runs"] == log.count("### python3 07_infer.py")),
+           ("pre-lab quiz graded 10 of 10", open(sys.argv[2]).read().count("- RIGHT") == 10),
+           ("lab not finished before the post-lab", "lab_finish" not in rec)]
+for name, ok in checks:
+    print(("PASS  " if ok else "FAIL  ") + name)
+sys.exit(0 if all(ok for _, ok in checks) else 1)
+PY
