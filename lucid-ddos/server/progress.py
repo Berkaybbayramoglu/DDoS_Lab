@@ -36,16 +36,16 @@ CHECKPOINTS = [
     ("normalize", "Step 3 - normalization passes every rule of check.py", "python3 check.py --stage normalize --dir work/03_norm_global"),
     ("features", "Step 4 - feature selection passes every rule of check.py", "python3 check.py --stage features --dir work/04_feat_global_lucid"),
     ("shape", "Step 5 - shaping passes every rule of check.py", "python3 check.py --stage shape --dir work/05_shape_global_lucid"),
-    ("baseline", "Steps 6-8 - the model 'global' trained, applied and evaluated with the expected result", "08_evaluate.py --name global --group normalization"),
+    ("baseline", "Steps 6-8 - the model 'global' matches the reference", "08_evaluate.py --name global --group normalization"),
     ("exp1_normalization", "Experiment 1 - all normalization runs match the reference", "08_evaluate.py --group normalization"),
     ("exp2_features", "Experiment 2 - all feature selection runs match the reference", "08_evaluate.py --group features"),
     ("exp3_shape", "Experiment 3 - all shaping runs match the reference", "08_evaluate.py --group shape"),
     ("exp4_classical", "Experiment 4 - all classical detection runs match the reference", "08_evaluate.py --group classical"),
     ("exp5_explain", "Experiment 5 - the three explanations match the reference", "15_explain.py"),
-    ("exp6_shift", "Experiment 6 - all runs of training on another network match the reference", "08_evaluate.py --group shift"),
+    ("exp6_shift", "Experiment 6 - all runs on another network match the reference", "08_evaluate.py --group shift"),
     ("results", "All runs of the lab sheet match the reference", "python3 check.py --stage results --dir results"),
     ("figures", "The five comparison figures were drawn", "python3 09_plot.py --groups normalization features shape classical shift"),
-    ("incident", "Post-lab - live test: both attackers blocked, the client not, recall 100 %, no false positives", "11_incident_report.py"),
+    ("incident", "Post-lab - only the attackers blocked, recall 100 %, FPR 0 %", "11_incident_report.py"),
     ("postlab_quiz", "Post-lab quiz answered", "python3 quiz.py postlab"),
 ]
 NAMES = [c[0] for c in CHECKPOINTS]
@@ -206,7 +206,7 @@ def show():
           f"inference: {rec.get('inference_runs', 0)} runs, {rec.get('inference_seconds', 0)} s")
     print(f"{done} of {len(NAMES)} checkpoints passed ({100 * done / len(NAMES):.0f} %)")
     if nxt:
-        print(f"next: {nxt[0]}  ->  {nxt[1]}")
+        print(f"next: {nxt[0]}\n      {nxt[1]}")
     print(f"all checkpoints passed - {'yes' if done == len(NAMES) else 'no'}")   # read by checkwork (prestop, no colon)
 
 
