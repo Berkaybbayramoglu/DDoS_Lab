@@ -18,10 +18,12 @@ SEED = 42
 os.environ.setdefault("PYTHONHASHSEED", str(SEED))
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
-# The same computation kernels on every processor: PyTorch and oneDNN use AVX-512 code on
-# processors that have it, which rounds differently than the AVX2 code of other processors (one
-# training of the lab, lucid_ids, got stuck on an AVX-512 machine). Limit both to AVX2 when the
-# processor has it; ONEDNN_MAX_CPU_ISA is only an upper limit.
+# The same computation kernels on every processor: PyTorch, oneDNN and Intel MKL (PyTorch's matrix
+# library) use AVX-512 code on processors that have it, which rounds differently than the AVX2 code of
+# other processors (one training of the lab, lucid_ids, got stuck on an AVX-512 machine; on an Intel
+# AVX-512 processor the models differed slightly, enough to change the permutation importance of
+# Experiment 5). Limit all three to AVX2 when the processor has it; the settings are upper limits and
+# change nothing on AVX2 processors. MKL reads its setting when PyTorch is loaded, after lablib.
 try:
     with open("/proc/cpuinfo") as _fh:
         _has_avx2 = " avx2" in _fh.read()
@@ -29,6 +31,7 @@ except OSError:
     _has_avx2 = False
 if _has_avx2:
     os.environ.setdefault("ATEN_CPU_CAPABILITY", "avx2")
+    os.environ.setdefault("MKL_ENABLE_INSTRUCTIONS", "AVX2")
 os.environ.setdefault("ONEDNN_MAX_CPU_ISA", "AVX2")
 
 import numpy as np  # noqa: E402

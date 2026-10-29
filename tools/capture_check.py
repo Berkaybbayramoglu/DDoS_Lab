@@ -13,7 +13,7 @@ check() compares the record with this evidence:
                  the first captured command
   checkpoints    every passed checkpoint at the end of a captured run of the script that passes it
                  (within CHECKPOINT_GAP), with the expected success line in its output (e.g. "window stage - 100 % of
-                 the rules pass"); its minutes consistent with lab_start
+                 the rules pass (lab sheet)"); its minutes consistent with lab_start
   runs           every recorded training/inference run matches a captured run of the same script (starts
                  within START_GAP after it, ends within END_GAP before it; one recorded run per captured
                  run), its seconds match its start and end, and no successful captured run is missing
@@ -124,7 +124,7 @@ def evidence(name, run):
     """Does this captured run pass the checkpoint `name`?"""
     p, a, o = run["program"], run["args"], run["out"]
     if name in ("window", "flows", "normalize", "features", "shape"):
-        return p == "check.py" and _arg(a, "--stage", name) and f"{name} stage - 100 % of the rules pass" in o
+        return p == "check.py" and _arg(a, "--stage", name) and f"{name} stage - 100 % of the rules pass (lab sheet)" in o
     if name == "results":
         return p == "check.py" and "results stage - 100 % of the reference runs match" in o
     if name == "baseline":
@@ -236,8 +236,9 @@ def check(rec, runs, seed, quiz_files):
         text = quiz_files.get(f"gradelab/{name}.txt")
         lines = None if text is None else len(text.splitlines())
         if lines != minutes:
-            issues.append(f"gradelab {name}: {lines} line(s) in results/gradelab/{name}.txt, "
-                          f"but the record gives {minutes} minute(s)")
+            have = "missing" if lines is None else f"{lines} line(s)"
+            want = "no time" if minutes is None else f"{minutes} minute(s)"
+            issues.append(f"gradelab {name}: results/gradelab/{name}.txt {have}, but the record gives {want}")
 
     # quizzes: the graded first attempt against the first completed quiz run on the screen
     for q in ("prelab", "postlab"):

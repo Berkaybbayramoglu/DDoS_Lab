@@ -77,11 +77,23 @@ checks = [("attacker1 blocked", sys.argv[2] in blocked), ("attacker2 blocked", s
 for name, ok in checks:
     print(("PASS  " if ok else "FAIL  ") + name)
 rec = __import__("json").load(open(sys.argv[1].replace("incident_report.txt", "time_result.json")))
+def gradelab_ok(rec):
+    # results/gradelab/<name>.txt has one line per minute; a time not reached (lab_minutes needs the
+    # lab start that Labtainer's first start writes, not done here) has no file
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(sys.argv[1])))
+    import progress
+    gl = os.path.join(os.path.dirname(sys.argv[1]), "gradelab")
+    for name, minutes in progress.gradelab_minutes(rec).items():
+        path = os.path.join(gl, name + ".txt")
+        if (sum(1 for _ in open(path)) if os.path.exists(path) else None) != minutes:
+            return False
+    return True
 cp = rec["checkpoints"]
 checks += [("live detection timed", any(r["script"] == "10_detect_block.py" for r in rec.get("inference", []))),
            ("incident checkpoint passed", "passed" in cp.get("incident", {})),
            ("end of the lab set by the report", "lab_finish" in rec),
-           ("gradelab lab_minutes written", sum(1 for _ in open(sys.argv[1].replace("incident_report.txt", "gradelab/lab_minutes.txt"))) == rec["lab_minutes"]),
+           ("gradelab files match the record", gradelab_ok(rec)),
            ("post-lab quiz graded 8 of 8", open(sys.argv[1].replace("incident_report.txt", "quiz_postlab.txt")).read().count("- RIGHT") == 8)]
 for name, ok in checks[-5:]:
     print(("PASS  " if ok else "FAIL  ") + name)

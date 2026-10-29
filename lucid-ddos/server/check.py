@@ -7,7 +7,9 @@ Run it after each step to see whether the step did what the lab sheet describes:
   python3 check.py --stage features  --dir work/04_feat_global_lucid
   python3 check.py --stage shape     --dir work/05_shape_global_lucid
 Every rule is recomputed from the previous step's files and compared. The table shows how many
-items satisfy each rule; the score is the share of rules that pass completely.
+items satisfy each rule; the score is the share of rules that pass completely. A step counts for the
+lab (progress.py, Labtainer) only in the folder above, made with the settings of the lab sheet; a
+check of that folder made with other settings warns and names the option to fix.
 
 After the experiments, compare your runs with the reference results of the lab:
   python3 check.py --stage results   --dir results
@@ -26,6 +28,45 @@ import progress
 
 def ratio(ok, total):
     return f"{ok}/{total}", ok == total
+
+
+# The folders and settings of Steps 1-5 of the lab sheet. A step's checkpoint (progress.py) and its
+# Labtainer goal count only a check of this folder made with these settings; checks of other folders
+# (the experiments) are not counted, and a lab-sheet folder made with other settings gets a warning.
+# Every pipeline.json repeats the settings of the steps before it, so each step adds its own.
+SHEET_PCAPS = ["cic_ddos2019_sample.pcap.gz", "lab_traffic.pcap.gz"]
+SHEET = [
+    ("window", "work/01_window", "01_window.py", {"pcap": SHEET_PCAPS, "window_s": 100.0}),
+    ("flows", "work/02_flows", "02_flows.py", {
+        "attackers": ["172.16.0.5", "172.30.0.66", "172.30.0.67"],
+        "victims": ["192.168.50.1", "192.168.50.4", "172.30.0.10"],
+        "split": {"test": 0.1, "val": 0.1}, "balanced": True}),
+    ("normalize", "work/03_norm_global", "03_normalize.py", {"norm_mode": "global", "fit_on": "all"}),
+    ("features", "work/04_feat_global_lucid", "04_features.py", {"feature_set": "lucid"}),
+    ("shape", "work/05_shape_global_lucid", "05_shape.py", {"n_packets": 100}),
+]
+SHEET_HINT = {"pcap": "the --pcap of 01_window.py", "window_s": "the -t of 01_window.py",
+              "attackers": "the --attackers of 02_flows.py", "victims": "the --victims of 02_flows.py",
+              "split": "the --test and --val of 02_flows.py", "balanced": "the --no_balance of 02_flows.py",
+              "norm_mode": "the --mode of 03_normalize.py", "fit_on": "the --fit-on of 03_normalize.py",
+              "feature_set": "the --set (or --features) of 04_features.py", "n_packets": "the -n of 05_shape.py"}
+
+
+def sheet_check(stage, d):
+    """(is the lab-sheet folder of this stage, settings that differ from the lab sheet)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    names = [s[0] for s in SHEET]
+    folder = SHEET[names.index(stage)][1]
+    if os.path.normpath(os.path.join(here, folder)) != os.path.normpath(os.path.abspath(d)):
+        return False, []
+    pipe = lablib.load_pipeline(d)
+    want = {}
+    for _, _, _, settings in SHEET[:names.index(stage) + 1]:
+        want.update(settings)
+    have = dict(pipe)
+    have["pcap"] = [os.path.basename(p) for p in pipe.get("pcap", [])]
+    wrong = [f"{k} is {have.get(k)}, expected {v} ({SHEET_HINT[k]})" for k, v in want.items() if have.get(k) != v]
+    return True, wrong
 
 
 def check_window(d):
@@ -284,8 +325,22 @@ def main():
     scored = [r for r in rules if r[1] != "info"]
     lablib.print_table([[name, val, "PASS" if ok else "FAIL"] for name, val, ok in rules], ["rule", "result", ""])
     score = 100 * sum(ok for _, _, ok in scored) / len(scored)
-    print(f"{args.stage} stage - {score:.0f} % of the rules pass")     # graded by Labtainer (no colon)
-    progress.checkpoint(args.stage, score == 100, score=int(round(score)))
+    step = [s[0] for s in SHEET].index(args.stage) + 1
+    in_sheet, wrong = sheet_check(args.stage, args.dir)
+    if in_sheet and wrong:
+        print(f"warning - these are not the settings of Step {step} of the lab sheet:")
+        for w in wrong:
+            print(f"  {w}")
+        print("  this check is not counted: run the step again with the settings of the lab sheet")
+    counted = in_sheet and not wrong
+    # graded by Labtainer (no colon): only a counted check prints "(lab sheet)"
+    print(f"{args.stage} stage - {score:.0f} % of the rules pass" + (" (lab sheet)" if counted else ""))
+    if not in_sheet:
+        print(f"(not the folder of Step {step}: only {SHEET[step - 1][1]} counts for the checkpoint)")
+    if counted:
+        progress.checkpoint(args.stage, score == 100, score=int(round(score)))
+    elif in_sheet:
+        progress.checkpoint(args.stage, False, score=int(round(score)))
 
 
 if __name__ == "__main__":

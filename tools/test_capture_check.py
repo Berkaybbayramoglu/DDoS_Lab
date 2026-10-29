@@ -37,7 +37,7 @@ def iso(t):
 # (start, end, command, screen output) of the captured runs, seconds after T0
 RUNS = [
     (40, 61, "python3 quiz.py prelab", "prelab quiz - 9 of 10 correct\n-> results/quiz_prelab.json"),
-    (150, 160, "python3 check.py --stage window --dir work/01_window", "window stage - 100 % of the rules pass"),
+    (150, 160, "python3 check.py --stage window --dir work/01_window", "window stage - 100 % of the rules pass (lab sheet)"),
     (300, 380, "python3 06_train.py --data work/05_shape_global_lucid --model models/global.pt",
      "36858 training samples (both networks), 10 epochs in 76.0 s -> models/global.pt"),
     (390, 393, "python3 07_infer.py --model models/global.pt --data work/05_shape_global_lucid --split test --out results/global.csv",
@@ -82,7 +82,7 @@ def consistent(rec):
     return rec
 
 
-def submission(folder, rec, answers=ANSWERS, drop=(), zip_offset=0, gradelab="record"):
+def submission(folder, rec, answers=ANSWERS, drop=(), zip_offset=0, gradelab="record", runs=RUNS):
     """Writes <folder>/<student>.lucid-ddos.lab; zip_offset: zip file times in another time zone."""
     def member(z, name, data, t):
         info = zipfile.ZipInfo(name, datetime.fromtimestamp(t + zip_offset, timezone.utc).timetuple()[:6])
@@ -90,7 +90,7 @@ def submission(folder, rec, answers=ANSWERS, drop=(), zip_offset=0, gradelab="re
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         member(z, ".local/.seed", "seed", T0)
-        for start, end, cmd, out in RUNS:
+        for start, end, cmd, out in runs:
             prog = cmd.split()[2] if cmd.startswith("sudo ") else cmd.split()[1]
             if prog in drop:
                 continue
@@ -158,6 +158,10 @@ def main():
               ("gradelab minutes edited by hand", dict(rec=record(), gradelab=dict(progress.gradelab_minutes(record()), lab_minutes=30)),
                "gradelab lab_minutes"),
               ("no gradelab minute files (older lab version)", dict(rec=record(), gradelab=None), None)]
+    # a Step 1 check of another folder (or with other settings) prints no "(lab sheet)" and passes nothing
+    other = [(a, b, c.replace("work/01_window", "work/01_window_t10"), o.replace(" (lab sheet)", "")) if "--stage window" in c
+             else (a, b, c, o) for a, b, c, o in RUNS]
+    cases.append(("window passed outside the lab sheet folder", dict(rec=record(), runs=other), "checkpoint window"))
     failed = 0
     with tempfile.TemporaryDirectory() as tmp:
         for name, kw, expect in cases:

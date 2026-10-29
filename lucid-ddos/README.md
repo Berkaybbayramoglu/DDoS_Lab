@@ -262,7 +262,7 @@ the lab sheet: `Y` = passed. `checkwork` also says, when not every checkpoint is
 | --- | --- |
 | `prelab_quiz`, `postlab_quiz` | Correct answers in the first attempt of `quiz.py prelab` (10 questions) / `quiz.py postlab` (8) |
 | `lab_minutes`, `dataset_min`, `results_min`, `training_min` | Minutes from opening the lab to its end, to the end of Steps 1-5, to all runs matching the reference; minutes of all trainings (`results/gradelab/*.txt`, one line per minute, written by `progress.py`) |
-| `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass`" |
+| `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass (lab sheet)`": the folder of the lab sheet (`work/01_window` … `work/05_shape_global_lucid`) made with the settings of the lab sheet; a check of another folder is not counted, and a lab-sheet folder made with other settings (e.g. `-n 10`) gets a warning that names the wrong option |
 | `baseline_match` | Steps 6–8: the run `global` matches the reference |
 | `exp1_match` … `exp6_match` | Every run of the experiment matches the reference (Experiment 5: the three explanations) |
 | `results_check` | `check.py --stage results`: all 23 runs of the lab sheet match the reference |
@@ -303,7 +303,7 @@ The columns `verified` (`yes` / `NO`) and `issues` show the result:
 | Checked | Against the capture |
 | --- | --- |
 | `lab_start` | the creation of `.local/.seed` (within 2 minutes), not after the first command |
-| every passed checkpoint | the end of a captured run of the script that passes it, with its success line on the screen (e.g. `window stage - 100 % of the rules pass`, `your run: OK`); its minutes |
+| every passed checkpoint | the end of a captured run of the script that passes it, with its success line on the screen (e.g. `window stage - 100 % of the rules pass (lab sheet)`, `your run: OK`); its minutes |
 | every training / inference run | one captured run of the same script that it starts just after and ends just before; its seconds; no completed captured run missing from the record |
 | `lab_finish`, `lab_minutes` | the first completed `11_incident_report.py` run |
 | quizzes | the graded first attempt has the score that the first completed quiz run showed on the screen; the number of attempts |
