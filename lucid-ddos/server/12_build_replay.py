@@ -1,5 +1,8 @@
 """Step 12 (post-lab) – Build the replay traffic from the VALIDATION split.
 
+Learning outcome: testing a detector on traffic it has never seen (two attackers and a legitimate
+client from the validation split), as a real incident would.
+
 Why: in this lab the number of epochs comes from the paper, so we do not need the validation split
 to pick a model. Instead we reuse it as held-out traffic that was never seen in training, and replay
 it against the server to simulate a real incident. The student's own model then has to detect and

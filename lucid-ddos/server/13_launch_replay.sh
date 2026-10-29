@@ -1,6 +1,9 @@
 #!/bin/bash
 # Step 13 (post-lab) – Start the simulated incident.
 #
+# Learning outcome: running an incident with traffic the model has never seen, sent by several hosts
+# at once (two attackers and a legitimate client), as a real attack would arrive.
+#
 # Copies the replay files built by 12_build_replay.py to the traffic containers over SSH (with the
 # student's own key, post-lab step 0) and starts them all at once:
 #           attacker1 <- replay/attacker1.pcap

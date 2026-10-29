@@ -1,5 +1,8 @@
 """Step 10 (post-lab) – Detect and block attack traffic with the trained model.
 
+Learning outcome: applying a trained model to live traffic and stopping the attackers with firewall
+rules while the attack is going on, without cutting off legitimate hosts.
+
 This is the defensive side: the server monitors its own interface, applies exactly the same
 pipeline the model was trained with (window -> flows -> normalization -> features -> shape),
 classifies every flow, and for each flow classified as DDoS it drops further traffic from the
