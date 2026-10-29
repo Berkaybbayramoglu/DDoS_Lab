@@ -53,6 +53,8 @@ def server_files(archive):
                             "time_result.json", "quiz_prelab.txt", "quiz_postlab.txt",
                             "quiz_prelab.json", "quiz_postlab.json"):
                         found[base] = z.read(name).decode(errors="replace")
+                    elif "results/gradelab/" in name and base.endswith(".txt"):     # the minutes gradelab shows
+                        found["gradelab/" + base] = z.read(name).decode(errors="replace")
                 runs, offset = capture_check.read_captures(z)
                 seed = capture_check.seed_time(z, offset)
     return found, runs, seed

@@ -307,6 +307,7 @@ The columns `verified` (`yes` / `NO`) and `issues` show the result:
 | every training / inference run | one captured run of the same script that it starts just after and ends just before; its seconds; no completed captured run missing from the record |
 | `lab_finish`, `lab_minutes` | the first completed `11_incident_report.py` run |
 | quizzes | the graded first attempt has the score that the first completed quiz run showed on the screen; the number of attempts |
+| the minutes in gradelab | `results/gradelab/*.txt` have as many lines as the record gives minutes (lines added by hand are found) |
 
 `lab_start_capture`, `lab_finish_capture` and `lab_minutes_capture` give the times from the capture
 alone. A command not typed in a lab terminal (e.g. run from a script file) is not captured, so it is

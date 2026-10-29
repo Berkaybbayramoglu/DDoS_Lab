@@ -20,13 +20,17 @@ check() compares the record with this evidence:
   lab end        lab_finish inside the first captured 11_incident_report.py run that wrote the report
   quizzes        the graded first attempt (results/quiz_<name>.txt) has the score that Labtainer
                  captured on the screen of the first completed quiz run
+  gradelab       the minute files gradelab counts (results/gradelab/*.txt) give the minutes of the
+                 record, so lines added to them by hand are found
 It returns the problems found and the times derived from the capture alone. Commands not typed in a lab
 terminal (e.g. started from a script file) are not captured; they show up as "not found in Labtainer's
 capture", which is a reason to look, not proof of tampering.
 """
 import json
+import os
 import re
 import statistics
+import sys
 from datetime import datetime, timezone
 
 STAMP = "%Y%m%d%H%M%S"
@@ -40,6 +44,9 @@ START_GAP = 30                # seconds; not for sudo commands, which wait for t
 END_GAP = 10
 CHECKPOINT_GAP = 30
 LAB_START_TOLERANCE = 120     # seconds between the creation of .local/.seed and fixlocal.sh
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lucid-ddos", "server"))
+import progress  # noqa: E402  (gradelab_minutes: the times gradelab shows)
+
 SUCCESS = {"06_train.py": "training samples", "07_infer.py": "samples classified in",
            "10_detect_block.py": "flows seen"}
 
@@ -221,6 +228,16 @@ def check(rec, runs, seed, quiz_files):
             issues.append(f"lab_minutes {rec.get('lab_minutes')} do not match lab_start and lab_finish")
     elif reports:
         issues.append(f"lab_finish missing although the report was written at {iso(reports[0]['finish'])}")
+
+    # the minutes gradelab shows (results/gradelab/*.txt, one line per minute) must be those of the record;
+    # a submission without them (a lab version before them, or deleted) shows empty columns in gradelab
+    has_gradelab = any(k.startswith("gradelab/") for k in quiz_files)
+    for name, minutes in (progress.gradelab_minutes(rec).items() if has_gradelab else []):
+        text = quiz_files.get(f"gradelab/{name}.txt")
+        lines = None if text is None else len(text.splitlines())
+        if lines != minutes:
+            issues.append(f"gradelab {name}: {lines} line(s) in results/gradelab/{name}.txt, "
+                          f"but the record gives {minutes} minute(s)")
 
     # quizzes: the graded first attempt against the first completed quiz run on the screen
     for q in ("prelab", "postlab"):

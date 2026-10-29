@@ -82,7 +82,7 @@ def consistent(rec):
     return rec
 
 
-def submission(folder, rec, answers=ANSWERS, drop=(), zip_offset=0):
+def submission(folder, rec, answers=ANSWERS, drop=(), zip_offset=0, gradelab="record"):
     """Writes <folder>/<student>.lucid-ddos.lab; zip_offset: zip file times in another time zone."""
     def member(z, name, data, t):
         info = zipfile.ZipInfo(name, datetime.fromtimestamp(t + zip_offset, timezone.utc).timetuple()[:6])
@@ -100,6 +100,11 @@ def submission(folder, rec, answers=ANSWERS, drop=(), zip_offset=0):
         member(z, ".local/result/prestop.stdout.20261023021818", "host clock", T0)
         if rec is not None:
             member(z, "results/time_result.json", rec if isinstance(rec, str) else progress._dump(rec), T0 + 2782)
+        if gradelab == "record" and isinstance(rec, dict):           # what progress.py writes
+            gradelab = progress.gradelab_minutes(rec)
+        for name, minutes in (gradelab.items() if isinstance(gradelab, dict) else []):
+            if minutes is not None:
+                member(z, f"results/gradelab/{name}.txt", "".join(f"minute {i}\n" for i in range(1, minutes + 1)), T0 + 2782)
         if answers is not None:
             member(z, "results/quiz_prelab.txt", answers, T0 + 61)
             member(z, "results/quiz_prelab.json", json.dumps({"attempts": [{"correct": 9}]}), T0 + 61)
@@ -149,7 +154,10 @@ def main():
               ("quiz file deleted", dict(rec=record(), answers=None), "quiz_prelab.txt is missing"),
               ("record deleted", dict(rec=None), "no results/time_result.json"),
               ("record damaged", dict(rec="{ not json"), "no results/time_result.json"),
-              ("report capture removed", dict(rec=record(), drop=("11_incident_report.py",)), "11_incident_report")]
+              ("report capture removed", dict(rec=record(), drop=("11_incident_report.py",)), "11_incident_report"),
+              ("gradelab minutes edited by hand", dict(rec=record(), gradelab=dict(progress.gradelab_minutes(record()), lab_minutes=30)),
+               "gradelab lab_minutes"),
+              ("no gradelab minute files (older lab version)", dict(rec=record(), gradelab=None), None)]
     failed = 0
     with tempfile.TemporaryDirectory() as tmp:
         for name, kw, expect in cases:
