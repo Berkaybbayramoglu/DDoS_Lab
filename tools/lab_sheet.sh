@@ -102,6 +102,15 @@ checks += [("training runs timed (one per 06_train.py)", rec["training_runs"] ==
            ("inference runs timed (one per 07_infer.py)", rec["inference_runs"] == log.count("### python3 07_infer.py")),
            ("pre-lab quiz graded 10 of 10", open(sys.argv[2]).read().count("- RIGHT") == 10),
            ("lab not finished before the post-lab", "lab_finish" not in rec)]
+# the minutes gradelab shows: one line per minute in results/gradelab/<name>.txt
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(sys.argv[1])))
+import progress
+gl = os.path.join(os.path.dirname(sys.argv[1]), "gradelab")
+for name, minutes in progress.gradelab_minutes(rec).items():
+    path = os.path.join(gl, name + ".txt")
+    lines = sum(1 for _ in open(path)) if os.path.exists(path) else None
+    checks.append((f"gradelab {name}: {lines} lines for {minutes} minutes", lines == minutes))
 for name, ok in checks:
     print(("PASS  " if ok else "FAIL  ") + name)
 sys.exit(0 if all(ok for _, ok in checks) else 1)

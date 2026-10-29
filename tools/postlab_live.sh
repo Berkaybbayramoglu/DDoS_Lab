@@ -81,8 +81,9 @@ cp = rec["checkpoints"]
 checks += [("live detection timed", any(r["script"] == "10_detect_block.py" for r in rec.get("inference", []))),
            ("incident checkpoint passed", "passed" in cp.get("incident", {})),
            ("end of the lab set by the report", "lab_finish" in rec),
+           ("gradelab lab_minutes written", sum(1 for _ in open(sys.argv[1].replace("incident_report.txt", "gradelab/lab_minutes.txt"))) == rec["lab_minutes"]),
            ("post-lab quiz graded 8 of 8", open(sys.argv[1].replace("incident_report.txt", "quiz_postlab.txt")).read().count("- RIGHT") == 8)]
-for name, ok in checks[-4:]:
+for name, ok in checks[-5:]:
     print(("PASS  " if ok else "FAIL  ") + name)
 sys.exit(0 if all(ok for _, ok in checks) else 1)
 PY

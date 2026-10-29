@@ -11,7 +11,9 @@ dependencies, so it is safe to import anywhere):
   lab_finish     the first time the last script of the lab, 11_incident_report.py, completed (not the
                  time the lab was stopped); lab_minutes = lab_finish - lab_start
 The file goes to the instructor with the student's work (stoplab); tools/time_report.py collects
-the files of a whole class into one table.
+the files of a whole class into one table. Four of the times also appear in gradelab's report
+(results/gradelab/*.txt, one line per minute): lab_minutes, dataset_min (Steps 1-5 passed),
+results_min (all runs match the reference) and training_min (all trainings together).
 
 Students see their progress at any time:
   python3 progress.py
@@ -27,6 +29,9 @@ from datetime import datetime, timezone
 HOME = os.path.dirname(os.path.abspath(__file__))
 TIME_FILE = os.path.join(HOME, "results", "time_result.json")
 LOCK_FILE = os.path.join(HOME, "results", ".time_result.lock")
+# Labtainer's gradelab report shows whole numbers only from counts, so every time it reports is also
+# written as a file of one line per minute (results.config reads it with LINE_COUNT)
+GRADELAB_DIR = os.path.join(HOME, "results", "gradelab")
 
 # (id, what passes it, the command that checks it) in the order of the lab sheet
 CHECKPOINTS = [
@@ -102,8 +107,33 @@ def _update(change):
                 fh.write(_dump(rec))
             os.replace(tmp, TIME_FILE)
             _give_back(os.path.dirname(TIME_FILE), TIME_FILE, LOCK_FILE)
+            _write_gradelab(rec)
     except Exception as e:  # the record must never break a lab step
         print(f"(note: the progress record {TIME_FILE} could not be updated: {e})", file=sys.stderr)
+
+
+def gradelab_minutes(rec):
+    """The times gradelab shows, in whole minutes (None: not reached yet)."""
+    cps = rec.get("checkpoints", {})
+    return {"lab_minutes": rec.get("lab_minutes"),                         # opening -> end of the lab
+            "dataset_min": cps.get("shape", {}).get("minutes"),             # Steps 1-5 passed
+            "results_min": cps.get("results", {}).get("minutes"),           # all runs match the reference
+            "training_min": int(round(rec.get("training_seconds", 0) / 60))}  # all trainings together
+
+
+def _write_gradelab(rec):
+    os.makedirs(GRADELAB_DIR, exist_ok=True)
+    paths = [GRADELAB_DIR]
+    for name, minutes in gradelab_minutes(rec).items():
+        path = os.path.join(GRADELAB_DIR, name + ".txt")
+        if minutes is None:
+            if os.path.exists(path):
+                os.remove(path)
+            continue
+        with open(path, "w") as fh:
+            fh.write("".join(f"minute {i}\n" for i in range(1, minutes + 1)))
+        paths.append(path)
+    _give_back(*paths)
 
 
 def _give_back(*paths):

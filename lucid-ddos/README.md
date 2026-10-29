@@ -261,6 +261,7 @@ the lab sheet: `Y` = passed. `checkwork` also says, when not every checkpoint is
 | Goal | Source |
 | --- | --- |
 | `prelab_quiz`, `postlab_quiz` | Correct answers in the first attempt of `quiz.py prelab` (10 questions) / `quiz.py postlab` (8) |
+| `lab_minutes`, `dataset_min`, `results_min`, `training_min` | Minutes from opening the lab to its end, to the end of Steps 1-5, to all runs matching the reference; minutes of all trainings (`results/gradelab/*.txt`, one line per minute, written by `progress.py`) |
 | `window_check` … `shape_check` | `check.py` stdout contains "`<stage> stage - 100 % of the rules pass`" |
 | `baseline_match` | Steps 6–8: the run `global` matches the reference |
 | `exp1_match` … `exp6_match` | Every run of the experiment matches the reference (Experiment 5: the three explanations) |
@@ -286,7 +287,9 @@ scripts write through `progress.py`:
 | `checkpoints` | Each checkpoint: the first time it was passed (`passed`, `minutes` after `lab_start`), `attempts` and `last_score`. Written by `check.py`, `08_evaluate.py`, `09_plot.py`, `15_explain.py`, `11_incident_report.py`, `quiz.py` |
 | `training`, `inference` | Start, end and seconds of every `06_train.py` and of every `07_infer.py` / `10_detect_block.py` run, with model and data |
 
-Labtainer's report shows only `Y`/`N` and whole numbers, so the times are collected separately:
+Labtainer's report shows only `Y`/`N` and whole numbers: `progress.py` therefore also writes the four
+times above as files of one line per minute, which `results.config` counts (`LINE_COUNT`). All times
+(every checkpoint, every run) are collected separately:
 `../tools/time_report.py <folder with the submissions> --out times.csv --runs runs.csv` reads
 `results/time_result.json` and the quiz answers of every submitted archive and writes one row per
 student (start, end, minutes per checkpoint, attempts, quiz scores, training and inference time).
