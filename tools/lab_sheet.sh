@@ -42,7 +42,7 @@ for m in none theoretical batchnorm; do
 done
 # experiment 3: features, on the lab network (scaling fitted on it, trained on it, tested on it)
 L python3 03_normalize.py --in work/02_flows --mode global --fit-on lab --out work/03_norm_global_lab
-L python3 check.py --stage normalize --dir work/03_norm_global_lab
+L python3 check.py --stage normalize --dir work/03_norm_global_lab   # extra check, not in the manual (not counted)
 for s in lucid lucid_ids ids_only; do
   L python3 04_features.py --in work/03_norm_global_lab --set $s --out work/04_feat_lab_$s
   L python3 05_shape.py --in work/04_feat_lab_$s -n 100 --out work/05_shape_lab_$s
@@ -68,7 +68,7 @@ L python3 15_explain.py --model models/lab_lucid_ids.pt --data work/05_shape_lab
 L python3 15_explain.py --model models/global_lucid_n3.pt --data work/05_shape_global_lucid_n3
 # experiment 6: training on another network
 L python3 03_normalize.py --in work/02_flows --mode global --fit-on cic --out work/03_norm_global_cic
-L python3 check.py --stage normalize --dir work/03_norm_global_cic
+L python3 check.py --stage normalize --dir work/03_norm_global_cic   # extra check, not in the manual (not counted)
 L python3 04_features.py --in work/03_norm_global_cic --set lucid --out work/04_feat_cic_lucid
 L python3 05_shape.py --in work/04_feat_cic_lucid -n 100 --out work/05_shape_cic_lucid
 L python3 06_train.py --data work/05_shape_cic_lucid --train-on cic --model models/cic_lucid.pt

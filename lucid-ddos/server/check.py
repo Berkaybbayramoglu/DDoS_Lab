@@ -186,7 +186,8 @@ def check_shape(d):
     return rules
 
 
-# Reference results of the lab sheet (Labtainer, seed 42), in percent:
+# Reference results of the lab sheet (Labtainer, seed 42), in percent (two accuracies with three
+# decimals, 96.946 and 99.553, so that the expected value rounds to one decimal like the student's run):
 # (group, name): (accuracy, F1, false-positive rate, recall, expected settings)
 # Test split: 4,551 samples of both networks (447 CIC-DDoS2019 sample, 4,104 lab network); the
 # feature runs and the "test lab"/"test cic" runs use only the samples of one network (SAMPLES).
@@ -206,11 +207,11 @@ REFERENCE = {
     ("shape", "n=50"):                          (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 50, "fit_on": "all", "train_on": "all"}),
     ("shape", "n=100"):                         (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
     ("classical", "LUCID CNN"):                 (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
-    ("classical", "syn threshold"):             (96.95, 96.86, 0.00, 93.92, {"rule": "syn", "bots": 1}),
+    ("classical", "syn threshold"):             (96.946, 96.86, 0.00, 93.92, {"rule": "syn", "bots": 1}),
     ("classical", "syn threshold (50 bots)"):   (49.77, 0.00, 0.00, 0.00, {"rule": "syn", "bots": 50}),
     ("shift", "cic only (test cic)"):           (99.78, 99.83, 0.00, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "cic", "train_on": "cic"}),
     ("shift", "lab only (test cic)"):           (54.59, 49.38, 5.84, 33.79, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
-    ("shift", "cic + lab (test cic)"):          (99.55, 99.66, 0.65, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("shift", "cic + lab (test cic)"):          (99.553, 99.66, 0.65, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
     ("shift", "cic only (test lab)"):           (42.76, 0.00, 16.86, 0.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "cic", "train_on": "cic"}),
     ("shift", "lab only (test lab)"):           (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
     ("shift", "cic + lab (test lab)"):          (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
