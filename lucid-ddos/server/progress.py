@@ -59,6 +59,47 @@ GROUP_CHECKPOINT = {"normalization": "exp1_normalization", "features": "exp2_fea
                     "classical": "exp4_classical", "shift": "exp6_shift"}
 
 
+CAPINOUT = "/usr/sbin/capinout"          # Labtainer's recorder of typed commands (in the lab containers)
+
+
+def captured():
+    """Was the command that started this process recorded by Labtainer?
+
+    Labtainer records a typed command only when the line starts with it: it runs the command under
+    capinout. A command inside a loop, after ';' (e.g. 'clear; python3 ...'), with '&' or from a script
+    file runs without capinout and is not recorded, so its output and times cannot be graded. Outside a
+    Labtainer container (no capinout, e.g. the developer image) every command counts as recorded.
+    """
+    if not os.path.exists(CAPINOUT):
+        return True
+    pid = os.getppid()
+    for _ in range(16):                   # capinout -> exec_wrap.sh [-> sudo] -> python3
+        try:
+            with open(f"/proc/{pid}/stat") as fh:
+                stat = fh.read()
+        except OSError:
+            return False
+        if stat[stat.index("(") + 1:stat.rindex(")")].startswith("capinout"):
+            return True
+        pid = int(stat[stat.rindex(")") + 2:].split()[1])
+        if pid <= 1:
+            return False
+    return False
+
+
+def require_captured():
+    """Stop a lab script that Labtainer does not record, and tell the student how to run it."""
+    script = os.path.basename(sys.argv[0]) if sys.argv and sys.argv[0] else ""
+    if not script.endswith(".py") or captured():
+        return
+    import shlex
+    cmd = " ".join(["python3", script] + [shlex.quote(a) for a in sys.argv[1:]])
+    print(f"not started - Labtainer would not record this command, so it would not count for your progress\n"
+          f"and your grade: it was typed inside a loop, after ';' (e.g. 'clear; python3 ...'), with '&' or\n"
+          f"from a script file. Type the command on its own line:\n  {cmd}", file=sys.stderr)
+    sys.exit(1)
+
+
 def now():
     return time.time()
 

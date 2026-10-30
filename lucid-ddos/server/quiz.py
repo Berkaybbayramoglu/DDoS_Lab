@@ -22,6 +22,8 @@ import textwrap
 
 import progress
 
+progress.require_captured()               # the graded first attempt must be recorded by Labtainer
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 

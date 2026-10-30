@@ -34,6 +34,10 @@ if _has_avx2:
     os.environ.setdefault("MKL_ENABLE_INSTRUCTIONS", "AVX2")
 os.environ.setdefault("ONEDNN_MAX_CPU_ISA", "AVX2")
 
+import progress  # noqa: E402
+
+progress.require_captured()               # a lab script must be typed on its own line (Labtainer records it)
+
 import numpy as np  # noqa: E402
 
 

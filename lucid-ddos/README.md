@@ -255,7 +255,10 @@ The post-lab replays only validation flows of the lab network. To regenerate bot
 ## Assessment (`instr_config/`)
 
 `gradelab lucid-ddos` (instructor) and `checkwork lucid-ddos` (student) show one line per checkpoint of
-the lab sheet: `Y` = passed. `checkwork` also says, when not every checkpoint is passed yet, to run
+the lab sheet: `Y` = passed. Labtainer grades only commands it captured, and it captures a command only when a
+typed line starts with it; a lab script started inside a loop, after `;`, with `&` or from a script file
+(no `capinout` among its parent processes) does not start and prints the command to type on its own line
+(`progress.require_captured`, called by `lablib.py` and `quiz.py`). `checkwork` also says, when not every checkpoint is passed yet, to run
 `python3 progress.py`, which lists the checkpoints with their state and the command for the next one.
 
 | Goal | Source |

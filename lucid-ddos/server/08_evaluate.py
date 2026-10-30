@@ -17,6 +17,7 @@ import argparse
 import csv
 import json
 import os
+import shlex
 
 import numpy as np
 
@@ -51,12 +52,24 @@ def bootstrap(y, p, n=1000):
 
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    a.add_argument("--pred", required=True, help="CSV written by 07_infer.py (or 14_classical.py)")
+    a.add_argument("--pred", help="CSV written by 07_infer.py (or 14_classical.py)")
     a.add_argument("--name", required=True, help="name of this run (shown in plots)")
     a.add_argument("--group", default="other", help="experiment group, e.g. normalization, features, shape, classical")
     a.add_argument("--model", help="model file the predictions came from (links its training log for 09_plot.py)")
     a.add_argument("--registry", default="results/registry.json")
+    a.add_argument("--remove", action="store_true",
+                   help="remove the run --name of --group from the registry (e.g. one evaluated with a misspelled name)")
     args = a.parse_args()
+    if args.remove:
+        reg = json.load(open(args.registry)) if os.path.exists(args.registry) else []
+        keep = [r for r in reg if not (r["name"] == args.name and r["group"] == args.group)]
+        with open(args.registry, "w") as fh:
+            json.dump(keep, fh, indent=1)
+        print(f"removed run '{args.name}' of group '{args.group}' from {args.registry}" if len(keep) < len(reg)
+              else f"no run '{args.name}' in group '{args.group}' in {args.registry}: nothing removed")
+        return
+    if not args.pred:
+        a.error("--pred is required")
     lablib.set_seed()
 
     with open(args.pred) as fh:
@@ -101,6 +114,8 @@ def main():
         print(f"your run: {'OK - ' if ok else 'CHECK - '}{note}")
     else:
         print(f"no expected result for '{args.name}' in group '{args.group}' (not a run of the lab sheet)")
+        print("if the name or group is misspelled, evaluate again with the right ones and remove this run:\n"
+              f"  python3 08_evaluate.py --remove --name {shlex.quote(args.name)} --group {shlex.quote(args.group)}")
     done = sum(1 for r in reg if (r["group"], r["name"]) in check.REFERENCE and check.compare_run(r)[0])
     total = len(check.REFERENCE)
     print(f"progress: {done} of {total} runs of the lab sheet match the reference ({100 * done / total:.0f} %)")

@@ -53,6 +53,8 @@ def main():
     lablib.set_seed()
     import torch
 
+    if not os.path.exists(args.model):
+        raise SystemExit(f"{args.model} not found: train the model first (06_train.py --model {args.model})")
     ck = torch.load(args.model, map_location="cpu")
     pipe = ck["pipeline"]
     data_pipe = lablib.load_pipeline(args.data)

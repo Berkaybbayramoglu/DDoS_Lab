@@ -186,14 +186,14 @@ def check_shape(d):
     return rules
 
 
-# Reference results of the lab sheet (Labtainer, seed 42), in percent (two accuracies with three
-# decimals, 96.946 and 99.553, so that the expected value rounds to one decimal like the student's run):
+# Reference results of the lab sheet (Labtainer, seed 42), in percent (a few values with three decimals,
+# e.g. 96.946, so that the expected value rounds to one decimal like the student's run):
 # (group, name): (accuracy, F1, false-positive rate, recall, expected settings)
 # Test split: 4,551 samples of both networks (447 CIC-DDoS2019 sample, 4,104 lab network); the
 # feature runs and the "test lab"/"test cic" runs use only the samples of one network (SAMPLES).
 REFERENCE = {
     ("normalization", "global"):                (99.96, 99.96, 0.04, 99.96, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
-    ("normalization", "none"):                  (97.69, 97.65, 0.00, 95.41, {"norm_mode": "none", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("normalization", "none"):                  (97.69, 97.649, 0.00, 95.41, {"norm_mode": "none", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
     ("normalization", "theoretical"):           (99.89, 99.89, 0.18, 99.96, {"norm_mode": "theoretical", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
     ("normalization", "batchnorm"):             (99.98, 99.98, 0.00, 99.96, {"norm_mode": "batchnorm", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
     ("features", "lucid (test)"):               (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
@@ -211,7 +211,7 @@ REFERENCE = {
     ("classical", "syn threshold (50 bots)"):   (49.77, 0.00, 0.00, 0.00, {"rule": "syn", "bots": 50}),
     ("shift", "cic only (test cic)"):           (99.78, 99.83, 0.00, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "cic", "train_on": "cic"}),
     ("shift", "lab only (test cic)"):           (54.59, 49.38, 5.84, 33.79, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
-    ("shift", "cic + lab (test cic)"):          (99.553, 99.66, 0.65, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
+    ("shift", "cic + lab (test cic)"):          (99.553, 99.66, 0.649, 99.66, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
     ("shift", "cic only (test lab)"):           (42.76, 0.00, 16.86, 0.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "cic", "train_on": "cic"}),
     ("shift", "lab only (test lab)"):           (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "lab", "train_on": "lab"}),
     ("shift", "cic + lab (test lab)"):          (100.00, 100.00, 0.00, 100.00, {"norm_mode": "global", "features": "lucid", "n_packets": 100, "fit_on": "all", "train_on": "all"}),
@@ -335,7 +335,8 @@ def main():
         print("  this check is not counted: run the step again with the settings of the lab sheet")
     counted = in_sheet and not wrong
     # graded by Labtainer (no colon): only a counted check prints "(lab sheet)"
-    print(f"{args.stage} stage - {score:.0f} % of the rules pass" + (" (lab sheet)" if counted else ""))
+    print(f"{args.stage} stage - {score:.0f} % of the rules pass" + (" (lab sheet)" if counted else
+          " - not counted (other settings than the lab sheet)" if in_sheet else ""))
     if not in_sheet:
         print(f"(not the folder of Step {step}: only {SHEET[step - 1][1]} counts for the checkpoint)")
     if counted:
