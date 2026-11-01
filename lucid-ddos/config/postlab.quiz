@@ -11,7 +11,7 @@
 # server/quiz/postlab.quiz must stay identical to this file (tools/static_checks.py checks it).
 #
 0, Preface,
-"Post-lab quiz: what the experiments and the live incident showed. For every question, type the letter of the one correct option, using your own results. Two short survey questions at the end are not graded."
+"Post-lab quiz: what the experiments and the live incident showed. For every question, type the letter of the one correct option, using your own results. Two short survey questions at the end are not graded; press Enter to skip the second one."
 1, MultipleChoice, "Why does training on raw (unnormalized) header values work badly?", B,
 "Raw header values live on very different scales (feature dominance), which makes training unstable.",
 "Raw header values live on very different scales; the large ones dominate the gradients (feature dominance), as Experiment 1 shows.", "",

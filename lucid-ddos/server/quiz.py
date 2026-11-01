@@ -19,6 +19,7 @@ import csv
 import json
 import os
 import re
+import signal
 import sys
 import termios
 import textwrap
@@ -29,6 +30,11 @@ progress.require_captured()               # the graded first attempt must be rec
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def fill(text, **kw):
+    """textwrap.fill that keeps "79 %" and "CIC-DDoS2019" on one line."""
+    return textwrap.fill(text.replace(" %", "\0%"), break_on_hyphens=False, **kw).replace("\0%", " %")
 
 
 def read_quiz(path):
@@ -68,6 +74,18 @@ def read_quiz(path):
     return items
 
 
+# The terminal settings at the start: read_answer() switches the echo off while reading, and Ctrl+C makes
+# Labtainer's recorder end the quiz at once, so they are restored on Ctrl+C and on termination too.
+TTY_START = termios.tcgetattr(0) if os.isatty(0) else None
+
+
+def stop(signum, frame):
+    if TTY_START is not None:
+        termios.tcsetattr(0, termios.TCSADRAIN, TTY_START)
+    print("\nquiz stopped: nothing was saved; run it again to answer it", flush=True)
+    os._exit(1)
+
+
 def read_answer():
     """One line from the keyboard, shown once. Labtainer runs the command on a terminal that echoes
     the input while the student's terminal echoes it too, so every answer would appear twice: the
@@ -91,7 +109,7 @@ def read_answer():
 
 def ask(question):
     while True:
-        print(textwrap.fill(question, initial_indent="Question: ", subsequent_indent="          ") + " (T/F)? ",
+        print(fill(question, initial_indent="Question: ", subsequent_indent="          ") + " (T/F)? ",
               end="", flush=True)
         a = read_answer().upper()
         if a in ("T", "TRUE", "F", "FALSE"):
@@ -101,27 +119,30 @@ def ask(question):
 
 def choose(question, options):
     """The letter of one option; a typing error is asked again (as in the quiz module)."""
-    print(textwrap.fill(question, initial_indent="Question: ", subsequent_indent="          "))
+    print(fill(question, initial_indent="Question: ", subsequent_indent="          "))
     for letter, option in zip(LETTERS, options):
-        print(textwrap.fill(option, initial_indent=f"  {letter}) ", subsequent_indent="     "))
+        print(fill(option, initial_indent=f"  {letter}) ", subsequent_indent="     "))
     valid = LETTERS[:len(options)]
     while True:
         print(f"Your answer ({valid[0]}-{valid[-1]})? ", end="", flush=True)
         a = read_answer().upper()
         if len(a) == 1 and a in valid:
             return a
+        print(f"Please type one letter, {valid[0]} to {valid[-1]}.")
 
 
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument("quiz", choices=["prelab", "postlab"])
     args = a.parse_args()
+    signal.signal(signal.SIGINT, stop)
+    signal.signal(signal.SIGTERM, stop)
     items = read_quiz(os.path.join(HERE, "quiz", f"{args.quiz}.quiz"))
     t_start = progress.now()
     answers, wrong = [], set()
     for it in items:
         if it["type"] == "preface":
-            print(textwrap.fill(it["text"]) + "\n")
+            print(fill(it["text"]) + "\n")
             continue
         if it["prereq"] and it["prereq"] not in wrong:       # Labtainer: skipped when the prerequisite was right
             continue
@@ -130,7 +151,7 @@ def main():
                 given = choose(it["question"], it["options"])
                 text = it["options"][LETTERS.index(given)]
             else:
-                print(textwrap.fill(it["question"], initial_indent="Question: ", subsequent_indent="          ") + " ",
+                print(fill(it["question"], initial_indent="Question: ", subsequent_indent="          ") + " ",
                       end="", flush=True)
                 given, text = None, read_answer()
             print()
@@ -141,7 +162,7 @@ def main():
         else:
             given = ask(it["question"])
         ok = given == it["answer"]
-        print(textwrap.fill(("Correct. " if ok else "Incorrect. ") + (it["right"] if ok else it["wrong"])) + "\n")
+        print(fill(("Correct. " if ok else "Incorrect. ") + (it["right"] if ok else it["wrong"])) + "\n")
         if not ok:
             wrong.add(it["id"])
         answers.append({"id": it["id"], "type": it["type"], "answer": given, "expected": it["answer"], "correct": ok,

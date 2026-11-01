@@ -33,8 +33,8 @@
 "LUCID leaves addresses and ports out on purpose: the 5-tuple only groups packets into flows. Packet length, TCP window size and TCP flags are features.", "",
 "The packet length", "The TCP window size", "The source IP address", "The TCP flags"
 6, MultipleChoice, "A model scores 100 % on the test split because it memorised the attacker's IP address. What happens when the attacker uses another address?", B,
-"This is shortcut learning, which Experiment 2 makes visible.",
-"In a recorded dataset the attacker always uses the same address, so memorising it works on the test split but fails on a new address (shortcut learning, Experiment 2).", "",
+"This is shortcut learning; Experiment 2 will make it visible.",
+"In a recorded dataset the attacker always uses the same address, so memorising it works on the test split but fails on a new address (shortcut learning; you will see it in Experiment 2).", "",
 "It still detects the attack, because its test score was 100 %.", "It fails: it learned a shortcut, not how the attack traffic behaves.", "It retrains itself on the new address.", "It blocks every address it has not seen before."
 7, MultipleChoice, "A flow has fewer than n packets. How does it become an n x f sample matrix?", D,
 "Longer flows are cut after n packets; shorter ones are padded with zeros.",
@@ -50,5 +50,5 @@
 "It is 3 x 3 and slides along the packets and the features.", "It covers one packet at a time and ignores the order.", "It is 3 x f: it covers all features and slides only along the packets.", "It does not slide: one kernel covers the whole sample."
 10, MultipleChoice, "A detector counts the packets of every source address and raises an alarm above a threshold. Which attack does it miss?", B,
 "Spread over many addresses, every single source stays under the per-source limit.",
-"A distributed attack keeps every source under the per-source limit, so the threshold detector misses it (Experiment 4).", "",
-"A SYN flood sent by one fast source.", "A botnet that spreads the attack over many addresses, each under the threshold.", "An HTTP flood from a single address.", "None: counting packets per source detects every attack."
+"A distributed attack keeps every source under the per-source limit, so the threshold detector misses it (you will test this in Experiment 4).", "",
+"A SYN flood sent by one fast source.", "A botnet that spreads the attack over many addresses, each under the threshold.", "A UDP flood sent by one fast source.", "None: counting packets per source detects every attack."
