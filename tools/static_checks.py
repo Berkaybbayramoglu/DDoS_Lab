@@ -102,9 +102,17 @@ check("server/_bin/prestop executable", os.access(os.path.join(LAB, "server", "_
 for q in ("prelab", "postlab"):
     cfg, srv = os.path.join(LAB, "config", f"{q}.quiz"), os.path.join(LAB, "server", "quiz", f"{q}.quiz")
     check(f"quiz {q}: server/quiz copy equals config/", os.path.isfile(srv) and open(cfg).read() == open(srv).read())
-    items = [i for i in quiz.read_quiz(cfg) if i["type"] == "tf"]
-    check(f"quiz {q}: True/False questions with both responses",
-          bool(items) and all(i["answer"] in ("T", "F") and i["right"] and i["wrong"] for i in items))
+    items = quiz.read_quiz(cfg)
+    graded = [i for i in items if i["type"] in ("tf", "mc")]
+    check(f"quiz {q}: graded questions with both responses and an answer among the options",
+          bool(graded) and all(i["right"] and i["wrong"] and (i["answer"] in ("T", "F") if i["type"] == "tf"
+                                                              else i["answer"] in quiz.LETTERS[:len(i["options"])])
+                               for i in graded))
+    ids = [i["id"] for i in items if i["type"] != "preface"]
+    check(f"quiz {q}: unique question IDs, no blank lines (the quiz module stops at a blank line)",
+          len(ids) == len(set(ids)) and all(line.strip() for line in open(cfg)))
+    want = {"prelab": 10, "postlab": 8}[q]               # the counts in goals.config and in the manuals
+    check(f"quiz {q}: {want} graded questions", len(graded) == want, str(len(graded)))
 
 # dataset
 for name in ("lab_traffic.pcap.gz", "cic_ddos2019_sample.pcap.gz"):

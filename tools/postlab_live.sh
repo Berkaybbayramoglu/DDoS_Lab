@@ -60,7 +60,10 @@ $D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONDONTWRITEBYTEC
    python3 11_incident_report.py --log results/incident_live.csv --victim $VIC --attackers $A1 $A2 \
    --out results/incident_report.txt
 $D run --rm --cpus=1 -u "$(id -u):$(id -g)" -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -v "$SRV":/srv -w /srv -i lucid-server \
-   sh -c "printf 'T\nF\nT\nF\nT\nF\nT\nF\n' | python3 quiz.py postlab" | tail -2
+   sh -c "$(cat <<'K'
+python3 -c "import quiz; [print(i['answer'] if i['type'] in ('tf', 'mc') else ('A' if i['options'] else '')) for i in quiz.read_quiz('quiz/postlab.quiz') if i['type'] != 'preface']" | python3 quiz.py postlab
+K
+)" | tail -2
 $D logs pl-server 2>/dev/null | tail -0
 $D rm -f pl-server pl-att1 pl-att2 pl-client >/dev/null 2>&1; $D network rm plnet >/dev/null
 echo "done -> server/results/incident_live.csv, server/results/incident_report.txt"

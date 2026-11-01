@@ -1,8 +1,11 @@
 """Pre-lab and post-lab quiz, answered in the server terminal so that the answers reach the instructor.
 
 The questions are the lab's Labtainer quizzes (quiz/prelab.quiz, quiz/postlab.quiz, the same files as
-config/*.quiz, which Labtainer's own `quiz` command shows on the VM without saving the answers).
-Every question is True/False. After each answer the right answer is explained.
+config/*.quiz). They use the format of the Labtainer quiz module (github.com/CRADLEUM/Labtainer-quiz_module),
+whose `quiz` command on the VM asks the same questions: Preface, TrueFalse, MultipleChoice (graded; the
+student types the letter of one option) and Survey (not graded; an option or free text). A question with
+a prerequisite is asked only when the student answered that question incorrectly. After each graded
+answer the right answer is explained.
 
 usage:  python3 quiz.py prelab        (before the lab)
         python3 quiz.py postlab       (after the post-incident report)
@@ -25,6 +28,7 @@ import progress
 progress.require_captured()               # the graded first attempt must be recorded by Labtainer
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def read_quiz(path):
@@ -43,14 +47,24 @@ def read_quiz(path):
                 continue
             fields = [f.strip() for f in next(csv.reader([re.sub(r', *"', ',"', quest)]))]
             quest = ""
-            kind = fields[1].upper()
+            kind, qid = fields[1].upper(), fields[0].lower()
+            prereq = lambda f: f.lower() if f else None
             if kind == "PREFACE":
                 items.append({"type": "preface", "text": fields[2]})
-            elif kind == "TRUEFALSE":
-                items.append({"type": "tf", "id": fields[0], "question": fields[2], "answer": fields[3].upper(),
-                              "right": fields[4], "wrong": fields[5], "prereq": fields[6].lower() if len(fields) > 6 and fields[6] else None})
+            elif kind == "TRUEFALSE" and len(fields) >= 6:
+                items.append({"type": "tf", "id": qid, "question": fields[2], "answer": fields[3].upper(),
+                              "right": fields[4], "wrong": fields[5], "prereq": prereq(fields[6]) if len(fields) > 6 else None})
+            elif kind == "MULTIPLECHOICE" and len(fields) >= 9:      # the module requires at least two options
+                options = fields[7:]
+                if fields[3].upper() not in LETTERS[:len(options)]:
+                    raise SystemExit(f"{path}: answer {fields[3]} of question {qid} is not one of its options")
+                items.append({"type": "mc", "id": qid, "question": fields[2], "answer": fields[3].upper(),
+                              "right": fields[4], "wrong": fields[5], "prereq": prereq(fields[6]), "options": options})
+            elif kind == "SURVEY" and len(fields) >= 4:
+                items.append({"type": "survey", "id": qid, "question": fields[2], "prereq": prereq(fields[3]),
+                              "options": fields[4:]})
             else:
-                raise SystemExit(f"{path}: unknown question type {fields[1]!r} (only TrueFalse and Preface)")
+                raise SystemExit(f"{path}: question {qid}: unknown type {fields[1]!r} or not enough fields")
     return items
 
 
@@ -85,6 +99,19 @@ def ask(question):
         print("Please answer T or F.")
 
 
+def choose(question, options):
+    """The letter of one option; a typing error is asked again (as in the quiz module)."""
+    print(textwrap.fill(question, initial_indent="Question: ", subsequent_indent="          "))
+    for letter, option in zip(LETTERS, options):
+        print(textwrap.fill(option, initial_indent=f"  {letter}) ", subsequent_indent="     "))
+    valid = LETTERS[:len(options)]
+    while True:
+        print(f"Your answer ({valid[0]}-{valid[-1]})? ", end="", flush=True)
+        a = read_answer().upper()
+        if len(a) == 1 and a in valid:
+            return a
+
+
 def main():
     a = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     a.add_argument("quiz", choices=["prelab", "postlab"])
@@ -98,13 +125,29 @@ def main():
             continue
         if it["prereq"] and it["prereq"] not in wrong:       # Labtainer: skipped when the prerequisite was right
             continue
-        given = ask(it["question"])
+        if it["type"] == "survey":                           # not graded: one option, or free text
+            if it["options"]:
+                given = choose(it["question"], it["options"])
+                text = it["options"][LETTERS.index(given)]
+            else:
+                print(textwrap.fill(it["question"], initial_indent="Question: ", subsequent_indent="          ") + " ",
+                      end="", flush=True)
+                given, text = None, read_answer()
+            print()
+            answers.append({"id": it["id"], "type": "survey", "answer": given, "answer_text": text, "correct": None})
+            continue
+        if it["type"] == "mc":
+            given = choose(it["question"], it["options"])
+        else:
+            given = ask(it["question"])
         ok = given == it["answer"]
         print(textwrap.fill(("Correct. " if ok else "Incorrect. ") + (it["right"] if ok else it["wrong"])) + "\n")
         if not ok:
             wrong.add(it["id"])
-        answers.append({"id": it["id"], "answer": given, "expected": it["answer"], "correct": ok})
-    n_ok, total = sum(x["correct"] for x in answers), len(answers)
+        answers.append({"id": it["id"], "type": it["type"], "answer": given, "expected": it["answer"], "correct": ok,
+                        **({"answer_text": it["options"][LETTERS.index(given)]} if it["type"] == "mc" else {})})
+    graded = [x for x in answers if x["correct"] is not None]
+    n_ok, total = sum(x["correct"] for x in graded), len(graded)
     print(f"{args.quiz} quiz - {n_ok} of {total} correct")
 
     res = os.path.join(HERE, "results")
@@ -122,7 +165,7 @@ def main():
     first = os.path.join(res, f"quiz_{args.quiz}.txt")
     if not os.path.exists(first):                       # the graded first attempt
         with open(first, "w") as fh:
-            for x in answers:
+            for x in graded:
                 fh.write(f"question {x['id']} answer {x['answer']} - {'RIGHT' if x['correct'] else 'WRONG'}\n")
     progress.checkpoint(f"{args.quiz}_quiz", True, score=int(round(100 * n_ok / max(total, 1))))
     attempts = len(log["attempts"])

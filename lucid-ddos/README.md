@@ -49,7 +49,7 @@ a model prepared differently from the data (window, flows, normalization, featur
 | 15 | `15_explain.py` | What the model relies on (permutation importance) and where it fails (errors by flow length) | `results/explain_*.csv`, `results/plots/explain_*.png` |
 | – | `check.py` | Checks the rules of every preprocessing step independently; `--stage results` compares every run of the lab sheet with the reference results (settings and metrics) | table on screen |
 | – | `progress.py` | The checkpoints of the lab: passed or not, when, how many attempts, and the next one to do | `results/time_result.json` |
-| – | `quiz.py prelab` / `quiz.py postlab` | Pre-lab and post-lab quiz (True/False); the first attempt is graded | `results/quiz_*.txt`, `results/quiz_*.json` |
+| – | `quiz.py prelab` / `quiz.py postlab` | Pre-lab and post-lab quiz (multiple choice; two ungraded survey questions at the end of the post-lab quiz); the first attempt is graded | `results/quiz_*.txt`, `results/quiz_*.json` |
 
 ```bash
 python3 01_window.py --pcap data/cic_ddos2019_sample.pcap.gz data/lab_traffic.pcap.gz -t 100 --out work/01_window
@@ -317,10 +317,16 @@ alone. A command not typed in a lab terminal (e.g. run from a script file) is no
 reported as "not found in Labtainer's capture": a reason to look, not proof of editing. The capture
 files are in the student's home directory too, so this makes editing much harder, not impossible.
 
-The quizzes are also Labtainer quizzes: `quiz -l lucid-ddos -q prelab` on the VM asks the same questions
-as a self-check, without saving the answers. To change a quiz, edit `config/<quiz>.quiz` and copy it to
-`server/quiz/` (the static checks require both to be identical); only `TrueFalse` and `Preface` entries
-exist in Labtainer's quiz format.
+The quizzes use the format of the [Labtainer quiz module](https://github.com/CRADLEUM/Labtainer-quiz_module)
+(`Preface`, `TrueFalse`, `MultipleChoice`, `Survey`, prerequisites; see its `QUIZ_GUIDE.md`). On a VM with
+the module installed, `quiz -l lucid-ddos -q prelab` asks the same questions on the VM and saves the
+answers, which `stoplab` adds to the `.lab` file (not shown by `gradelab`). `quiz.py` in the server
+terminal reads the same files with the same rules and is the graded path: its first attempt gives the
+`prelab_quiz` / `postlab_quiz` columns of `gradelab`, the checkpoints and the time record. To change a
+quiz, edit `config/<quiz>.quiz` and copy it to `server/quiz/`; the static checks require both to be
+identical, every graded question to have both responses and an answer among its options, unique IDs,
+no blank lines (the module stops at one) and 10 / 8 graded questions (the counts in `goals.config` and
+the manuals).
 
 ## labedit
 

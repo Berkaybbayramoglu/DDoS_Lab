@@ -1,40 +1,54 @@
 #
-# lucid-ddos pre-lab quiz (Labtainer quiz format, True/False questions; see the Labtainer lab designer
-# guide, section 7). Take it before the lab:
-#   on the Labtainer VM:        quiz -l lucid-ddos -q prelab     (self-check, answers are not saved)
-#   in the server terminal:     python3 quiz.py prelab           (answers go to the instructor)
+# lucid-ddos pre-lab quiz: multiple choice (Labtainer quiz format with the MultipleChoice and Survey
+# types of the Labtainer quiz module, https://github.com/CRADLEUM/Labtainer-quiz_module).
+# Take it before the lab:
+#   in the server terminal:     python3 quiz.py prelab           (graded: the first attempt goes to the
+#                                                               instructor's gradelab report)
+#   on the Labtainer VM:        quiz -l lucid-ddos -q prelab     (with the quiz module: the answers are
+#                                                               saved and added to the .lab file)
+# Format: ID, MultipleChoice, "Question", answer letter, "Right message", "Wrong message", prerequisite,
+# "Option A", "Option B", ...  (no blank lines; a line ending with ',' continues the entry).
 # server/quiz/prelab.quiz must stay identical to this file (tools/static_checks.py checks it).
 #
 0, Preface,
-"Pre-lab quiz: DDoS attacks, flow-based detection and the LUCID CNN. Answer T (true) or F (false). \
-The quiz checks whether you are ready for the lab; the theory is in Sections 1-3 of the manual."
-1, TrueFalse, "In a DDoS attack the traffic comes from many hosts at the same time, so blocking a single address is rarely enough.", T,
-"The attack is distributed: a botnet sends the traffic from many addresses.",
-"A DDoS attack is distributed: a botnet sends the traffic from many addresses, so blocking one address is rarely enough."
-2, TrueFalse, "A SYN flood is an application-layer attack made of valid HTTP requests.", F,
-"A SYN flood is a protocol attack: it opens TCP connections and never completes the handshake.",
-"A SYN flood is a protocol attack that fills the table of half-open TCP connections. The HTTP flood is the application-layer attack."
-3, TrueFalse, "LUCID waits until a flow has ended before it classifies the flow.", F,
-"LUCID decides window by window (t = 100 s) on the part of each flow it has seen so far.",
-"An online detector cannot wait for a flow to end. LUCID collects the traffic in time windows of t = 100 s and decides on the part of each flow seen in the window."
-4, TrueFalse, "A request and its answer belong to the same (bidirectional) flow.", T,
+"Pre-lab quiz: DDoS attacks, flow-based detection and the LUCID CNN. For every question, type the letter of the one correct option. The quiz checks whether you are ready for the lab; the theory is in Sections 1-3 of the manual."
+1, MultipleChoice, "Why is blocking a single IP address rarely enough to stop a DDoS attack?", A,
+"A DDoS attack is distributed: a botnet sends the traffic from many addresses.",
+"A DDoS attack is distributed: a botnet sends the traffic from many addresses, so blocking one address is rarely enough.", "",
+"The traffic comes from many hosts at the same time (a botnet).", "DDoS traffic is encrypted, so its addresses cannot be read.", "Firewalls cannot block single IP addresses.", "The victim's address changes during the attack."
+2, MultipleChoice, "What kind of attack is a SYN flood?", B,
+"It fills the server's table of half-open TCP connections.",
+"A SYN flood is a protocol attack that fills the table of half-open TCP connections; the HTTP flood is the application-layer attack.", "",
+"An application-layer attack made of valid HTTP requests.", "A protocol attack: it opens TCP connections and never completes the handshake.", "A reflection attack that amplifies DNS answers.", "An attack that guesses the passwords of a web server."
+3, MultipleChoice, "When does LUCID classify the traffic of a flow?", D,
+"An online detector cannot wait for a flow to end; LUCID decides in every time window.",
+"An online detector cannot wait for a flow to end. LUCID collects the traffic in time windows of t = 100 s and decides on the part of each flow seen in the window.", "",
+"Only after the flow has ended.", "Once a day, on all traffic recorded that day.", "Packet by packet, without grouping packets into flows.", "Window by window (t = 100 s), on the part of the flow seen in the window."
+4, MultipleChoice, "Which packets belong to the same (bidirectional) flow?", C,
 "Packets are grouped by their 5-tuple in both directions, so a request and its answer are seen together.",
-"Flows are bidirectional: both directions of a conversation are grouped by the same 5-tuple."
-5, TrueFalse, "The source and destination IP addresses are among the 11 LUCID packet features.", F,
-"The 5-tuple only groups packets into flows; it is not a model input.",
-"LUCID leaves addresses and ports out on purpose: the 5-tuple only groups packets into flows."
-6, TrueFalse, "A model that memorises the attacker's IP address can score perfectly on the test split and still fail when the attacker uses another address.", T,
+"Flows are bidirectional: both directions of a conversation are grouped by the same 5-tuple.", "",
+"All packets from the same source address.", "All packets sent within the same second.", "The packets with the same 5-tuple in either direction, so a request and its answer.", "Only the packets from the client to the server."
+5, MultipleChoice, "Which of these is NOT one of the 11 LUCID packet features?", C,
+"Addresses and ports only group packets into flows; they are not model inputs.",
+"LUCID leaves addresses and ports out on purpose: the 5-tuple only groups packets into flows. Packet length, TCP window size and TCP flags are features.", "",
+"The packet length", "The TCP window size", "The source IP address", "The TCP flags"
+6, MultipleChoice, "A model scores 100 % on the test split because it memorised the attacker's IP address. What happens when the attacker uses another address?", B,
 "This is shortcut learning, which Experiment 2 makes visible.",
-"In a recorded dataset the attacker always uses the same address, so memorising it works on the test split but fails on a new address (shortcut learning, Experiment 2)."
-7, TrueFalse, "Every sample is an n x f matrix; a flow with fewer than n packets is padded with rows of zeros.", T,
+"In a recorded dataset the attacker always uses the same address, so memorising it works on the test split but fails on a new address (shortcut learning, Experiment 2).", "",
+"It still detects the attack, because its test score was 100 %.", "It fails: it learned a shortcut, not how the attack traffic behaves.", "It retrains itself on the new address.", "It blocks every address it has not seen before."
+7, MultipleChoice, "A flow has fewer than n packets. How does it become an n x f sample matrix?", D,
 "Longer flows are cut after n packets; shorter ones are padded with zeros.",
-"The CNN needs a fixed input size: shorter flows are padded with rows of zeros and longer ones are cut after n packets."
-8, TrueFalse, "The minimum and maximum of the global normalization are measured on the test split, so that the test data uses the full 0-1 range.", F,
+"The CNN needs a fixed input size: shorter flows are padded with rows of zeros and longer ones are cut after n packets.", "",
+"It is left out of the dataset.", "Its packets are repeated until there are n of them.", "n is made smaller for this flow.", "It is padded with rows of zeros."
+8, MultipleChoice, "On which data are the minimum and maximum of the global normalization measured?", A,
 "The scaling is always fitted on the training split only.",
-"The scaling is fitted on the training split only; fitting it on the test data would leak information about the test set into training."
-9, TrueFalse, "The convolution kernel of the LUCID CNN is as wide as the sample matrix, so it slides only along the packet axis.", T,
+"The scaling is fitted on the training split only; fitting it on the test data would leak information about the test set into training.", "",
+"The training split only.", "The test split, so that the test data uses the full 0-1 range.", "All splits together.", "The live traffic of the post-lab."
+9, MultipleChoice, "How does the convolution kernel of the LUCID CNN move over a sample?", C,
 "Each kernel covers 3 consecutive packets and all f features.",
-"The kernel is 3 x f: it covers all features and slides only along the packets, so the order of the packets matters."
-10, TrueFalse, "A threshold detector that counts the packets of every source address reliably detects a botnet that spreads its attack over many addresses.", F,
+"The kernel is 3 x f: it covers all features and slides only along the packets, so the order of the packets matters.", "",
+"It is 3 x 3 and slides along the packets and the features.", "It covers one packet at a time and ignores the order.", "It is 3 x f: it covers all features and slides only along the packets.", "It does not slide: one kernel covers the whole sample."
+10, MultipleChoice, "A detector counts the packets of every source address and raises an alarm above a threshold. Which attack does it miss?", B,
 "Spread over many addresses, every single source stays under the per-source limit.",
-"A distributed attack keeps every source under the per-source limit, so the threshold detector misses it (Experiment 4)."
+"A distributed attack keeps every source under the per-source limit, so the threshold detector misses it (Experiment 4).", "",
+"A SYN flood sent by one fast source.", "A botnet that spreads the attack over many addresses, each under the threshold.", "An HTTP flood from a single address.", "None: counting packets per source detects every attack."

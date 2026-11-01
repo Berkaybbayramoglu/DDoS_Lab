@@ -18,7 +18,7 @@ rm -rf work models results
 L() { echo "### $*"; "$@"; }
 L python3 progress.py --start                        # Labtainer: _bin/fixlocal.sh when the lab is opened
 echo "### python3 quiz.py prelab   (all answers right)"
-printf 'T\nF\nF\nT\nF\nT\nT\nF\nT\nF\n' | python3 quiz.py prelab
+python3 -c "import quiz; [print(i['answer'] if i['type'] in ('tf', 'mc') else ('A' if i['options'] else '')) for i in quiz.read_quiz('quiz/prelab.quiz') if i['type'] != 'preface']" | python3 quiz.py prelab   # the right answers, from the quiz file
 L python3 01_window.py --pcap data/cic_ddos2019_sample.pcap.gz data/lab_traffic.pcap.gz -t 100 --out work/01_window
 L python3 check.py --stage window --dir work/01_window
 L python3 02_flows.py --in work/01_window --attackers 172.16.0.5 172.30.0.66 172.30.0.67 --victims 192.168.50.1 192.168.50.4 172.30.0.10 --out work/02_flows
