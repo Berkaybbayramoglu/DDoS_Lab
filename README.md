@@ -113,3 +113,11 @@ version builds the images.
 
 Publishing needs the repository variable `DOCKERHUB_USERNAME` and the secret `DOCKERHUB_TOKEN`.
 The tools use `docker --context default`.
+
+## License
+
+The lab is licensed under the [MIT License](LICENSE). Parts from other projects keep their own terms:
+the CIC-DDoS2019 sample in `lucid-ddos/server/home_tar/data/` comes from the LUCID repository
+(Apache-2.0, `LICENSE-lucid-ddos.txt` next to it; citation in `README.txt`), and the files generated from
+Labtainer's templates (the Dockerfiles in `lucid-ddos/dockerfiles/`, `lucid-ddos/instr_config/pregrade.sh`)
+follow the terms of the Labtainer framework of the Naval Postgraduate School.
