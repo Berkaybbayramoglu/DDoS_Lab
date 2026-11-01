@@ -33,16 +33,16 @@
 "Permutation importance shuffles one feature at a time and measures the drop in accuracy (Experiment 5).", "",
 "How often a feature appears in the samples.", "How much the accuracy drops when the values of one feature are shuffled.", "The weight of a feature in the first convolution kernel.", "How long a feature takes to compute."
 6, MultipleChoice, "In Experiment 6, how did the model trained only on the CIC-DDoS2019 sample do on the lab network?", C,
-"Its recall on the lab network was about 0 %.",
-"On the lab network its accuracy was about 43 % and it caught almost none of the attacks (Experiment 6): a model must be validated on the network it protects.", "",
-"It detected the attacks of the lab network reliably.", "It reached the same accuracy as on its own test split.", "It caught almost none of the attacks: a model must be validated on the network it protects.", "It flagged only the legitimate client."
+"Its recall on the lab network was 0 %; the flows it flagged were all benign.",
+"On the lab network its accuracy was about 43 % and its recall 0 %: it caught none of the attacks and flagged some benign flows instead (Experiment 6). A model must be validated on the network it protects.", "",
+"It detected the attacks of the lab network reliably.", "It reached the same accuracy as on its own test split.", "It caught none of the attacks: a model must be validated on the network it protects.", "It flagged every flow of the lab network as an attack."
 7, MultipleChoice, "The 95 % confidence intervals of two runs overlap. What can you conclude?", D,
 "Overlapping intervals mean the difference may be due to the particular test samples.",
 "When the intervals overlap, the difference between the two runs may come from the particular test samples, so it cannot be claimed with confidence.", "",
 "The run with the higher value is clearly better.", "Both runs are wrong.", "The test split was too large.", "The difference may come from the particular test samples, so it cannot be claimed with confidence."
 8, MultipleChoice, "What was blocked in the live test of the post-lab?", A,
-"Each attacker was blocked with an iptables DROP rule a few seconds after its first flow.",
-"Only the two attacker addresses were blocked with iptables DROP rules; the legitimate client kept its access, which is what a good detector should achieve.", "",
+"Each attacker was blocked with an iptables rule after three of its flows had been flagged, a few seconds after its first flow.",
+"Only the two attacker addresses were blocked with iptables rules; the legitimate client kept its access, which is what a good detector should achieve.", "",
 "Only the two attacker addresses; the legitimate client kept its access.", "All three addresses, including the legitimate client.", "Nothing: the detector only raised alerts.", "Only the legitimate client."
 9, Survey, "How difficult was the lab for you? (not graded)", "",
 "Easy", "About right", "Difficult"
